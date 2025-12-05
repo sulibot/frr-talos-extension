@@ -216,23 +216,23 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  no bgp default ipv4-unicast
 
  ! Cilium peer configuration
- neighbor {{ bgp.cilium.peering.ipv4.remote }} remote-as {{ bgp.cilium.remote_asn }}
- neighbor {{ bgp.cilium.peering.ipv4.remote }} description Cilium-BGP-Control-Plane
- neighbor {{ bgp.cilium.peering.ipv4.remote }} passive
+ neighbor {{ bgp.cilium.peering.ipv4.local }} remote-as {{ bgp.cilium.remote_asn }}
+ neighbor {{ bgp.cilium.peering.ipv4.local }} description Cilium-BGP-Control-Plane
+ neighbor {{ bgp.cilium.peering.ipv4.local }} passive
 
  address-family ipv4 unicast
-  neighbor {{ bgp.cilium.peering.ipv4.remote }} activate
-  neighbor {{ bgp.cilium.peering.ipv4.remote }} route-map denymap out
+  neighbor {{ bgp.cilium.peering.ipv4.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv4.local }} route-map denymap out
  exit-address-family
 
 {% if bgp.cilium.peering.ipv6 is defined %}
- neighbor {{ bgp.cilium.peering.ipv6.remote }} remote-as {{ bgp.cilium.remote_asn }}
- neighbor {{ bgp.cilium.peering.ipv6.remote }} description Cilium-BGP-Control-Plane-IPv6
- neighbor {{ bgp.cilium.peering.ipv6.remote }} passive
+ neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.remote_asn }}
+ neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-BGP-Control-Plane-IPv6
+ neighbor {{ bgp.cilium.peering.ipv6.local }} passive
 
  address-family ipv6 unicast
-  neighbor {{ bgp.cilium.peering.ipv6.remote }} activate
-  neighbor {{ bgp.cilium.peering.ipv6.remote }} route-map denymap_v6 out
+  neighbor {{ bgp.cilium.peering.ipv6.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap_v6 out
  exit-address-family
 {% endif %}
 !
