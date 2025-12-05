@@ -159,30 +159,78 @@ fi
 log "Current processes:"
 ps -ef | grep -E "(bgpd|bfdd|zebra)" || true
 
-# Monitoring loop with BFD status
-MONITOR_INTERVAL=${MONITOR_INTERVAL:-60}
+# Monitoring loop with enhanced diagnostics
+MONITOR_INTERVAL=${MONITOR_INTERVAL:-300}  # 5 minutes
 MONITOR_COUNT=${MONITOR_COUNT:-5}
 
 count=0
 while true; do
     if [ $count -lt ${MONITOR_COUNT} ]; then
-        log "=== Status Check (${count}/${MONITOR_COUNT}) ==="
+        log "=== Status Check ($((count + 1))/${MONITOR_COUNT}) ==="
+        echo ""
 
-        # BGP status
+        # BGP Summary with clear header
+        log "BGP Summary:"
         vtysh -c "show bgp vrf all summary wide" || true
+        echo ""
+
+        # BGP Neighbors Detail
+        log "BGP Neighbors (IPv4):"
+        vtysh -c "show bgp ipv4 unicast neighbors" || true
+        echo ""
+
+        if [ -n "${PEER_IPV6_REMOTE}" ]; then
+            log "BGP Neighbors (IPv6):"
+            vtysh -c "show bgp ipv6 unicast neighbors" || true
+            echo ""
+        fi
+
+        # BGP Routes Advertised/Received
+        log "BGP Routes Advertised (IPv4):"
+        vtysh -c "show bgp ipv4 unicast neighbors advertised-routes" || true
+        echo ""
+
+        log "BGP Routes Received (IPv4):"
+        vtysh -c "show bgp ipv4 unicast neighbors routes" || true
+        echo ""
+
+        if [ -n "${PEER_IPV6_REMOTE}" ]; then
+            log "BGP Routes Advertised (IPv6):"
+            vtysh -c "show bgp ipv6 unicast neighbors advertised-routes" || true
+            echo ""
+
+            log "BGP Routes Received (IPv6):"
+            vtysh -c "show bgp ipv6 unicast neighbors routes" || true
+            echo ""
+        fi
+
+        # Running Configuration
+        log "Running Configuration:"
+        vtysh -c "show running-config" || true
+        echo ""
 
         # BFD status if configured
         if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then
             log "BFD Peer Status:"
             vtysh -c "show bfd peers brief" || true
+            echo ""
         fi
 
-        # Routing table
+        # Routing table summaries
+        log "IPv4 Route Summary:"
         vtysh -c "show ip route summary" || true
+        echo ""
 
         if [ -n "${PEER_IPV6_REMOTE}" ]; then
+            log "IPv6 Route Summary:"
             vtysh -c "show ipv6 route summary" || true
+            echo ""
         fi
+
+        # VRF details
+        log "VRF Status:"
+        vtysh -c "show vrf" || true
+        echo ""
 
         count=$((count + 1))
     fi

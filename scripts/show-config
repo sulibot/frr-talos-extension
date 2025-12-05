@@ -1,0 +1,3 @@
+#!/bin/bash
+# Show running FRR configuration
+vtysh -c "show running-config"

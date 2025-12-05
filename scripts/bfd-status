@@ -1,0 +1,7 @@
+#!/bin/bash
+# Show BFD peer status
+echo "=== BFD Peers Brief ==="
+vtysh -c "show bfd peers brief"
+echo ""
+echo "=== BFD Peers Detail ==="
+vtysh -c "show bfd peers"

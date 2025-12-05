@@ -20,6 +20,10 @@ COPY frr.conf.j2 /etc/frr/frr.conf.j2
 COPY docker-start /usr/lib/frr/docker-start
 RUN chmod 755 /usr/lib/frr/docker-start
 
+# Copy diagnostic scripts
+COPY scripts/ /usr/local/bin/frr-scripts/
+RUN chmod +x /usr/local/bin/frr-scripts/*
+
 # Copy FRR daemon configuration with BFD enabled
 COPY daemons /etc/frr/daemons
 

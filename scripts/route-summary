@@ -1,0 +1,10 @@
+#!/bin/bash
+# Show routing table summary
+echo "=== IPv4 Route Summary ==="
+vtysh -c "show ip route summary"
+echo ""
+echo "=== IPv6 Route Summary ==="
+vtysh -c "show ipv6 route summary"
+echo ""
+echo "=== VRF Status ==="
+vtysh -c "show vrf"

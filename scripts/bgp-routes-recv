@@ -1,0 +1,7 @@
+#!/bin/bash
+# Show routes received from BGP neighbors
+echo "=== IPv4 Routes Received ==="
+vtysh -c "show bgp ipv4 unicast neighbors routes"
+echo ""
+echo "=== IPv6 Routes Received ==="
+vtysh -c "show bgp ipv6 unicast neighbors routes"

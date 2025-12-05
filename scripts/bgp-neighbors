@@ -1,0 +1,7 @@
+#!/bin/bash
+# Show detailed BGP neighbor information
+echo "=== IPv4 BGP Neighbors ==="
+vtysh -c "show bgp ipv4 unicast neighbors"
+echo ""
+echo "=== IPv6 BGP Neighbors ==="
+vtysh -c "show bgp ipv6 unicast neighbors"

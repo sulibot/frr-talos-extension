@@ -1,0 +1,7 @@
+#!/bin/bash
+# Show routes being advertised to BGP neighbors
+echo "=== IPv4 Routes Advertised ==="
+vtysh -c "show bgp ipv4 unicast neighbors advertised-routes"
+echo ""
+echo "=== IPv6 Routes Advertised ==="
+vtysh -c "show bgp ipv6 unicast neighbors advertised-routes"

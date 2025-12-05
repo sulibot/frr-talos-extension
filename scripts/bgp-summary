@@ -1,0 +1,3 @@
+#!/bin/bash
+# Show BGP summary for all VRFs
+vtysh -c "show bgp vrf all summary wide"
