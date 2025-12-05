@@ -216,6 +216,10 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  no bgp default ipv4-unicast
 
  ! Cilium peer configuration
+ ! FRR in 'cilium' netns peers with Cilium in host netns via veth pair
+ ! veth-cilium (in FRR netns): has 'local' IP - this is the remote peer for Cilium
+ ! veth-frr (in host netns): has 'remote' IP - this is where FRR connects FROM
+ ! FRR listens on its end (veth-cilium with 'local') for Cilium to connect
  neighbor {{ bgp.cilium.peering.ipv4.local }} remote-as {{ bgp.cilium.remote_asn }}
  neighbor {{ bgp.cilium.peering.ipv4.local }} description Cilium-BGP-Control-Plane
  neighbor {{ bgp.cilium.peering.ipv4.local }} passive
