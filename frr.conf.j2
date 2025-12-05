@@ -278,6 +278,7 @@ router bgp {{ bgp.upstream.local_asn }}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family is not defined or peer.address_family == 'ipv4' %}
   neighbor {{ peer.address }} activate
+  neighbor {{ peer.address }} allowas-in
 {% if peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
@@ -310,6 +311,7 @@ router bgp {{ bgp.upstream.local_asn }}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family == 'ipv6' %}
   neighbor {{ peer.address }} activate
+  neighbor {{ peer.address }} allowas-in
 {% if peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
