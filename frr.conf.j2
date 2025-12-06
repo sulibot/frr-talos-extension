@@ -235,9 +235,6 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  neighbor {{ bgp.cilium.peering.ipv4.remote }} passive
 
  address-family ipv4 unicast
-  rd vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
-  rt vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
-  export vpn
   neighbor {{ bgp.cilium.peering.ipv4.remote }} activate
   neighbor {{ bgp.cilium.peering.ipv4.remote }} route-map denymap out
  exit-address-family
@@ -248,16 +245,20 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  neighbor {{ bgp.cilium.peering.ipv6.remote }} passive
 
  address-family ipv6 unicast
-  rd vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
-  rt vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
-  export vpn
   neighbor {{ bgp.cilium.peering.ipv6.remote }} activate
   neighbor {{ bgp.cilium.peering.ipv6.remote }} route-map denymap_v6 out
  exit-address-family
 {% endif %}
 !
 
-! Static routes to make Cilium peering subnet reachable in default VRF
+! Static null routes to make Cilium next-hops "reachable" for BGP route installation
+! Actual forwarding uses cross-VRF lookup via the /31 route below
+ip route {{ bgp.cilium.peering.ipv4.remote }}/32 Null0
+{% if bgp.cilium.peering.ipv6 is defined %}
+ipv6 route {{ bgp.cilium.peering.ipv6.remote }}/128 Null0
+{% endif %}
+!
+! Cross-VRF routes for actual packet forwarding to Cilium peering subnet
 ip route {{ bgp.cilium.peering.ipv4.local }}/31 0.0.0.0 nexthop-vrf {{ bgp.cilium.namespace }}
 {% if bgp.cilium.peering.ipv6 is defined %}
 ipv6 route {{ bgp.cilium.peering.ipv6.local }}/126 :: nexthop-vrf {{ bgp.cilium.namespace }}
@@ -328,10 +329,7 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
-  rd vpn export {{ bgp.upstream.local_asn }}:{{ rid_last }}
-  rt vpn import {{ bgp.cilium.local_asn }}:{{ rid_last }}
-  import vpn
-  route-map vpn import VPN-IMPORT
+  import vrf {{ bgp.cilium.namespace }}
   redistribute connected route-map loopbacks
  exit-address-family
 
@@ -364,14 +362,7 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
-  rd vpn export {{ bgp.upstream.local_asn }}:{{ rid_last }}
-  rt vpn import {{ bgp.cilium.local_asn }}:{{ rid_last }}
-{% if bgp.upstream.router_id_v6 is defined %}
-  import vpn
-  route-map vpn import VPN-IMPORT6
-{% else %}
-  import vpn
-{% endif %}
+  import vrf {{ bgp.cilium.namespace }}
   redistribute connected route-map loopbacks
  exit-address-family
 !
