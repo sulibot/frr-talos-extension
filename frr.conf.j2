@@ -226,16 +226,16 @@ router bgp {{ bgp.upstream.local_asn }}
 
  ! Cilium peer configuration
  ! Cilium in host netns peers with FRR via veth pair
- ! veth-frr (in host netns): Cilium's interface with 'remote' IP
- ! veth-cilium (in FRR netns): FRR's interface with 'local' IP
- ! FRR uses 'remote' IP as neighbor address
- neighbor {{ bgp.cilium.peering.ipv4.remote }} remote-as {{ bgp.cilium.remote_asn }}
- neighbor {{ bgp.cilium.peering.ipv4.remote }} description Cilium-BGP-Control-Plane
- neighbor {{ bgp.cilium.peering.ipv4.remote }} passive
+ ! veth-frr (host netns): 'remote' IP - FRR listens here
+ ! veth-cilium (cilium netns): 'local' IP - Cilium connects from here
+ ! FRR uses 'local' IP as BGP neighbor (Cilium's side of veth pair)
+ neighbor {{ bgp.cilium.peering.ipv4.local }} remote-as {{ bgp.cilium.remote_asn }}
+ neighbor {{ bgp.cilium.peering.ipv4.local }} description Cilium-BGP-Control-Plane
+ neighbor {{ bgp.cilium.peering.ipv4.local }} passive
 {% if bgp.cilium.peering.ipv6 is defined %}
- neighbor {{ bgp.cilium.peering.ipv6.remote }} remote-as {{ bgp.cilium.remote_asn }}
- neighbor {{ bgp.cilium.peering.ipv6.remote }} description Cilium-BGP-Control-Plane-IPv6
- neighbor {{ bgp.cilium.peering.ipv6.remote }} passive
+ neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.remote_asn }}
+ neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-BGP-Control-Plane-IPv6
+ neighbor {{ bgp.cilium.peering.ipv6.local }} passive
 {% endif %}
 
 {% if bgp.upstream.peers is defined %}
@@ -269,8 +269,8 @@ router bgp {{ bgp.upstream.local_asn }}
  ! Address families
  address-family ipv4 unicast
   ! Activate Cilium peer
-  neighbor {{ bgp.cilium.peering.ipv4.remote }} activate
-  neighbor {{ bgp.cilium.peering.ipv4.remote }} route-map denymap out
+  neighbor {{ bgp.cilium.peering.ipv4.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv4.local }} route-map denymap out
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family is not defined or peer.address_family == 'ipv4' %}
@@ -305,8 +305,8 @@ router bgp {{ bgp.upstream.local_asn }}
  address-family ipv6 unicast
 {% if bgp.cilium.peering.ipv6 is defined %}
   ! Activate Cilium IPv6 peer
-  neighbor {{ bgp.cilium.peering.ipv6.remote }} activate
-  neighbor {{ bgp.cilium.peering.ipv6.remote }} route-map denymap_v6 out
+  neighbor {{ bgp.cilium.peering.ipv6.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap_v6 out
 {% endif %}
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
