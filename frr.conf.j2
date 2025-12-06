@@ -120,11 +120,13 @@ route-map loopbacks permit 20
 route-map loopbacks permit 30
   match interface dummy1
 !
-route-map CILIUM-IN permit 10
+{# Use last octet of router-id for RD/RT uniqueness #}
+{% set rid_last = bgp.upstream.router_id.split('.')|last %}
+route-map VPN-IMPORT permit 10
  set ip next-hop {{ bgp.upstream.router_id }}
 !
 {% if bgp.upstream.router_id_v6 is defined %}
-route-map CILIUM-IN6 permit 10
+route-map VPN-IMPORT6 permit 10
  set ipv6 next-hop global {{ bgp.upstream.router_id_v6 }}
 !
 {% endif %}
@@ -233,8 +235,10 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  neighbor {{ bgp.cilium.peering.ipv4.remote }} passive
 
  address-family ipv4 unicast
+  rd vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
+  rt vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
+  export vpn
   neighbor {{ bgp.cilium.peering.ipv4.remote }} activate
-  neighbor {{ bgp.cilium.peering.ipv4.remote }} route-map CILIUM-IN in
   neighbor {{ bgp.cilium.peering.ipv4.remote }} route-map denymap out
  exit-address-family
 
@@ -244,8 +248,10 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  neighbor {{ bgp.cilium.peering.ipv6.remote }} passive
 
  address-family ipv6 unicast
+  rd vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
+  rt vpn export {{ bgp.cilium.local_asn }}:{{ rid_last }}
+  export vpn
   neighbor {{ bgp.cilium.peering.ipv6.remote }} activate
-  neighbor {{ bgp.cilium.peering.ipv6.remote }} route-map CILIUM-IN6 in
   neighbor {{ bgp.cilium.peering.ipv6.remote }} route-map denymap_v6 out
  exit-address-family
 {% endif %}
@@ -316,8 +322,11 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
+  rd vpn export {{ bgp.upstream.local_asn }}:{{ rid_last }}
+  rt vpn import {{ bgp.cilium.local_asn }}:{{ rid_last }}
+  import vpn
+  route-map vpn import VPN-IMPORT
   redistribute connected route-map loopbacks
-  import vrf {{ bgp.cilium.namespace }}
  exit-address-family
 
  address-family ipv6 unicast
@@ -349,8 +358,15 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
+  rd vpn export {{ bgp.upstream.local_asn }}:{{ rid_last }}
+  rt vpn import {{ bgp.cilium.local_asn }}:{{ rid_last }}
+{% if bgp.upstream.router_id_v6 is defined %}
+  import vpn
+  route-map vpn import VPN-IMPORT6
+{% else %}
+  import vpn
+{% endif %}
   redistribute connected route-map loopbacks
-  import vrf {{ bgp.cilium.namespace }}
  exit-address-family
 !
 ip protocol bgp route-map SETSRC
