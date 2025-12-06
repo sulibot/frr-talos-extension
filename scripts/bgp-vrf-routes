@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Show BGP routes in all VRFs (IPv4 and IPv6)
+vtysh -c "show bgp vrf all ipv4 unicast"
+echo ""
+vtysh -c "show bgp vrf all ipv6 unicast"

@@ -120,6 +120,14 @@ route-map loopbacks permit 20
 route-map loopbacks permit 30
   match interface dummy1
 !
+route-map CILIUM-IMPORT permit 10
+ set ip next-hop {{ bgp.upstream.router_id }}
+!
+{% if bgp.upstream.router_id_v6 is defined %}
+route-map CILIUM-IMPORT6 permit 10
+ set ipv6 next-hop global {{ bgp.upstream.router_id_v6 }}
+!
+{% endif %}
 {% if bgp.upstream.peers is defined %}
 ! Auto-generated route-maps and prefix-lists for network advertisements
 {% for peer in bgp.upstream.peers %}
@@ -308,6 +316,7 @@ router bgp {{ bgp.upstream.local_asn }}
 {% endif %}
   redistribute connected route-map loopbacks
   import vrf {{ bgp.cilium.namespace }}
+  table-map CILIUM-IMPORT
  exit-address-family
 
  address-family ipv6 unicast
@@ -341,6 +350,9 @@ router bgp {{ bgp.upstream.local_asn }}
 {% endif %}
   redistribute connected route-map loopbacks
   import vrf {{ bgp.cilium.namespace }}
+ {% if bgp.upstream.router_id_v6 is defined %}
+  table-map CILIUM-IMPORT6
+ {% endif %}
  exit-address-family
 !
 ip protocol bgp route-map SETSRC

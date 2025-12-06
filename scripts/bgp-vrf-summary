@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Show BGP summary for all VRFs (default + cilium)
+vtysh -c "show bgp vrf all summary"
