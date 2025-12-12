@@ -27,59 +27,10 @@ log "Configuration loaded from: ${CONFIG_SOURCE}"
 FRR_TEMPLATE="/etc/frr/frr.conf.j2"
 log "Using FRR template: ${FRR_TEMPLATE}"
 
-# Extract network configuration from config file
-log "Setting up network namespace for Cilium BGP peering"
-
-# Extract values from JSON config
-NAMESPACE_CILIUM=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('namespace','cilium'))")
-VETH_FRR=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('network',{}).get('veth_names',{}).get('frr_side','veth-frr'))")
-VETH_CILIUM=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('network',{}).get('veth_names',{}).get('cilium_side','veth-cilium'))")
-INTERFACE_MTU=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('network',{}).get('interface_mtu',1500))")
-
-# Extract peering IPs
-PEER_IP_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv4',{}).get('local',''))")
-PEER_IP_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv4',{}).get('remote',''))")
-PEER_IP_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv4',{}).get('prefix',31))")
-
-# Extract IPv6 if present
-PEER_IPV6_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('local',''))")
-PEER_IPV6_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('remote',''))")
-PEER_IPV6_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('prefix',126))")
-
-# Create network namespace
-/sbin/ip netns add ${NAMESPACE_CILIUM} || {
-    log "Network namespace ${NAMESPACE_CILIUM} already exists"
-}
-
-log "Creating veth pair: ${VETH_CILIUM} <-> ${VETH_FRR}"
-
-/sbin/ip link add ${VETH_CILIUM} type veth peer name ${VETH_FRR} || {
-    log "Veth pair already exists"
-}
-
-# Move one end to the namespace
-/sbin/ip link set ${VETH_CILIUM} netns ${NAMESPACE_CILIUM} || true
-
-# Configure IPv4 addresses
-if [ -n "${PEER_IP_LOCAL}" ] && [ -n "${PEER_IP_REMOTE}" ]; then
-    log "Configuring IPv4 peering: ${PEER_IP_LOCAL} <-> ${PEER_IP_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip a a ${PEER_IP_LOCAL}/${PEER_IP_PREFIX} dev ${VETH_CILIUM} || true
-    /sbin/ip a a ${PEER_IP_REMOTE}/${PEER_IP_PREFIX} dev ${VETH_FRR} || true
-fi
-
-# Configure IPv6 addresses
-if [ -n "${PEER_IPV6_LOCAL}" ] && [ -n "${PEER_IPV6_REMOTE}" ]; then
-    log "Configuring IPv6 peering: ${PEER_IPV6_LOCAL} <-> ${PEER_IPV6_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip -6 a a ${PEER_IPV6_LOCAL}/${PEER_IPV6_PREFIX} dev ${VETH_CILIUM} || true
-    /sbin/ip -6 a a ${PEER_IPV6_REMOTE}/${PEER_IPV6_PREFIX} dev ${VETH_FRR} || true
-fi
-
-# Bring up interfaces
-log "Bringing up interfaces with MTU ${INTERFACE_MTU}"
-/sbin/ip link set ${VETH_FRR} up || true
-/sbin/ip link set ${VETH_FRR} mtu ${INTERFACE_MTU} || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} up || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} || true
+# v1.0.14+: Cilium peers with FRR on localhost (127.0.0.1:179)
+# No veth pair or network namespace needed - standard BGP coexistence pattern
+# See: https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane-v2/
+log "Cilium BGP peering will use localhost (127.0.0.1) - no veth pair needed"
 
 # Version-based initialization
 CURRENT_VERSION=""
@@ -227,10 +178,7 @@ while true; do
             echo ""
         fi
 
-        # VRF details
-        log "VRF Status:"
-        vtysh -c "show vrf" || true
-        echo ""
+        # Note: VRF support removed in v1.0.13 - all BGP in default VRF
 
         count=$((count + 1))
     fi

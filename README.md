@@ -48,6 +48,7 @@ apiVersion: v1alpha1
 kind: ExtensionServiceConfig
 name: frr
 configFiles:
+  # Inline configuration example
   - content: |
       bgp:
         upstream:
@@ -62,6 +63,35 @@ configFiles:
                 profile: normal
     mountPath: /usr/local/etc/frr/config.yaml
 ```
+
+#### Host-mounted configuration (edit on disk)
+
+If you prefer to keep `frr.conf` writable on the node (for example at `/var/mnt/config/frr/config.yaml`), mount it instead of embedding the content:
+
+```yaml
+apiVersion: v1alpha1
+kind: ExtensionServiceConfig
+name: frr
+configFiles:
+  - source: /var/mnt/config/frr/config.yaml   # writable on the Talos node
+    mountPath: /usr/local/etc/frr/config.yaml
+  - content: |
+      zebra=true
+      zebra_options="-n -A 127.0.0.1"
+      bgpd=true
+      bgpd_options="-A 127.0.0.1"
+      staticd=true
+      staticd_options="-A 127.0.0.1"
+      bfdd=true
+      bfdd_options="-A 127.0.0.1"
+    mountPath: /usr/local/etc/frr/daemons
+  - content: |
+      service integrated-vtysh-config
+      hostname frr
+    mountPath: /usr/local/etc/frr/vtysh.conf
+```
+
+After updating the host file, reload FRR with `talosctl -n <node> service frr restart` or exec `vtysh -b -f /usr/local/etc/frr/config.yaml` inside the container.
 
 ## Configuration
 
@@ -144,6 +174,7 @@ See the `examples/` directory for complete configuration examples:
 - `config.yaml` - Basic configuration
 - `config-bfd.yaml` - Configuration with BFD
 - `extension-service-config.yaml` - Talos ExtensionServiceConfig
+- `extension-service-config-host-mounted.yaml` - ExtensionServiceConfig using a host-mounted `frr.conf`
 - `cilium-bgp-config.yaml` - Cilium BGP CRDs
 - `cilium-values.yaml` - Cilium Helm values
 

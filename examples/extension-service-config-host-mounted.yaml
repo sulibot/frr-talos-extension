@@ -1,0 +1,27 @@
+# ExtensionServiceConfig using a host-mounted FRR configuration
+---
+apiVersion: v1alpha1
+kind: ExtensionServiceConfig
+name: frr
+configFiles:
+  # Mount a writable host file into the container
+  - source: /var/mnt/config/frr/config.yaml   # create and edit this on the Talos node
+    mountPath: /usr/local/etc/frr/config.yaml
+
+  # FRR daemons configuration (inline)
+  - content: |
+      zebra=true
+      zebra_options="-n -A 127.0.0.1"
+      bgpd=true
+      bgpd_options="-A 127.0.0.1"
+      staticd=true
+      staticd_options="-A 127.0.0.1"
+      bfdd=true
+      bfdd_options="-A 127.0.0.1"
+    mountPath: /usr/local/etc/frr/daemons
+
+  # VTY shell configuration (inline)
+  - content: |
+      service integrated-vtysh-config
+      hostname frr
+    mountPath: /usr/local/etc/frr/vtysh.conf
