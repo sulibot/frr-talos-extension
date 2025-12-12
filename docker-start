@@ -6,26 +6,49 @@ log() {
     echo -e "[$(date +%Y-%m-%d-%H:%M:%S)][frr] $*" >&2
 }
 
-# Load configuration from files only
-log "Loading configuration from files..."
+# Check if pre-rendered frr.conf exists (delivered via ExtensionServiceConfig)
+if [ -f /usr/local/etc/frr/frr.conf ]; then
+    log "Found pre-rendered frr.conf at /usr/local/etc/frr/frr.conf"
+    log "Using native FRR configuration (skipping YAML config and template rendering)"
 
-# Validate and load configuration
-log "Validating configuration"
-python3 /usr/local/bin/config_loader.py --validate || {
-    log "Configuration validation failed"
-    exit 1
-}
+    # Copy pre-rendered config to /etc/frr/
+    mkdir -p /etc/frr
+    cp /usr/local/etc/frr/frr.conf /etc/frr/frr.conf
 
-# Generate JSON context for j2cli
-log "Generating configuration context"
-python3 /usr/local/bin/config_loader.py --json > /tmp/config.json
-CONFIG_SOURCE="/tmp/config.json"
+    log "Copied pre-rendered FRR configuration:"
+    cat /etc/frr/frr.conf
+else
+    # Legacy YAML-based configuration workflow
+    log "No pre-rendered frr.conf found, using YAML configuration workflow"
+    log "Loading configuration from files..."
 
-log "Configuration loaded from: ${CONFIG_SOURCE}"
+    # Validate and load configuration
+    log "Validating configuration"
+    python3 /usr/local/bin/config_loader.py --validate || {
+        log "Configuration validation failed"
+        exit 1
+    }
 
-# Use the FRR multi-peer template
-FRR_TEMPLATE="/etc/frr/frr.conf.j2"
-log "Using FRR template: ${FRR_TEMPLATE}"
+    # Generate JSON context for j2cli
+    log "Generating configuration context"
+    python3 /usr/local/bin/config_loader.py --json > /tmp/config.json
+    CONFIG_SOURCE="/tmp/config.json"
+
+    log "Configuration loaded from: ${CONFIG_SOURCE}"
+
+    # Use the FRR multi-peer template
+    FRR_TEMPLATE="/etc/frr/frr.conf.j2"
+    log "Using FRR template: ${FRR_TEMPLATE}"
+
+    # Generate FRR configuration
+    log "Generating FRR configuration from template: ${FRR_TEMPLATE}"
+
+    # Use the JSON context from config_loader
+    python3 /usr/local/bin/render_template.py ${FRR_TEMPLATE} ${CONFIG_SOURCE} /etc/frr/frr.conf
+
+    log "Generated FRR configuration:"
+    cat /etc/frr/frr.conf
+fi
 
 # v1.0.14+: Cilium peers with FRR on localhost (127.0.0.1:179)
 # No veth pair or network namespace needed - standard BGP coexistence pattern
@@ -69,22 +92,19 @@ if [ "$CURRENT_VERSION" != "$INSTALLED_VERSION" ] || [ ! -f /etc/frr/.initialize
     log "Initialized marker updated to version: ${CURRENT_VERSION}"
 fi
 
-# Ensure daemons file exists
-if [ ! -f /etc/frr/daemons ]; then
+# Ensure daemons file exists (mount from ExtensionServiceConfig or use defaults)
+if [ -f /usr/local/etc/frr/daemons ]; then
+    cp /usr/local/etc/frr/daemons /etc/frr/daemons
+elif [ ! -f /etc/frr/daemons ]; then
     cp /etc/frr.defaults/daemons /etc/frr/daemons
 fi
 
-# Generate FRR configuration
-log "Generating FRR configuration from template: ${FRR_TEMPLATE}"
-
-# Use the JSON context from config_loader
-python3 /usr/local/bin/render_template.py ${FRR_TEMPLATE} ${CONFIG_SOURCE} /etc/frr/frr.conf
-
-log "Generated FRR configuration:"
-cat /etc/frr/frr.conf
-
-# Create vtysh.conf if it doesn't exist
-[ -r /etc/frr/vtysh.conf ] || touch /etc/frr/vtysh.conf
+# Create vtysh.conf if it doesn't exist (mount from ExtensionServiceConfig or use defaults)
+if [ -f /usr/local/etc/frr/vtysh.conf ]; then
+    cp /usr/local/etc/frr/vtysh.conf /etc/frr/vtysh.conf
+elif [ ! -r /etc/frr/vtysh.conf ]; then
+    touch /etc/frr/vtysh.conf
+fi
 
 # Set ownership
 chown -R frr:frr /etc/frr || true
