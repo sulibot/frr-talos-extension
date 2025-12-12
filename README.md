@@ -42,22 +42,13 @@ This extension uses native FRR configuration format (`frr.conf`) instead of stru
 4. **Immutable image** - Config changes don't require rebuilding the extension image
 5. **Terraform integration** - Render per-node configs from templates and inject via ExtensionServiceConfig
 
-### Comparison with Bird2
-
-| Feature | FRR Extension | Bird2 Extension |
-|---------|---------------|-----------------|
-| Config format | Native frr.conf | Native bird.conf |
-| Image rebuilds | No (config is data) | Yes (config in image) |
-| Terraform workflow | Render → Inject → Apply | Build → Push → Bootstrap |
-| Runtime config updates | `talosctl apply-config` | Rebuild & redeploy |
-| Cilium integration | Native kernel redistribution | External peering only |
-
 ## Features
 
 - **Configuration via ExtensionServiceConfig**: All settings in YAML configuration files
 - **Multiple BGP Peers**: Configure unlimited peers with individual settings
 - **Per-Peer Configuration**: Different passwords, timers, BFD profiles per peer
-- **BGP Routing**: Full BGP support with FRR 10.4.1
+- **BGP Routing**: Full BGP support with FRR 10.5.0
+- **Prometheus Metrics**: Built-in metrics exporter on port 9342 (frr_exporter v1.8.0)
 - **Cilium Integration**: Works with Cilium BGP Control Plane for LoadBalancer services
 - **BFD Support**: Fast failure detection with configurable profiles
 - **Dual Stack**: IPv4 and IPv6 support with per-peer address families
@@ -531,6 +522,58 @@ The `examples/` directory contains complete working configurations:
 ### Cilium Integration Examples
 - **[examples/cilium-bgp-config.yaml](examples/cilium-bgp-config.yaml)** - Cilium BGP peering policy
 - **[examples/cilium-values.yaml](examples/cilium-values.yaml)** - Cilium Helm values
+
+## Prometheus Metrics
+
+FRR extension v1.0.17+ exposes Prometheus metrics on port 9342 via [frr_exporter](https://github.com/tynany/frr_exporter).
+
+### Available Metrics
+
+See [frr_exporter documentation](https://github.com/tynany/frr_exporter) for complete metric list.
+
+**Key metrics:**
+- `frr_bgp_peer_state` - BGP peer state (1=established, 0=down)
+- `frr_bgp_peer_uptime_seconds` - BGP peer uptime
+- `frr_bgp_peer_prefixes_received_count_total` - Routes received from peer
+- `frr_bgp_peer_prefixes_advertised_count_total` - Routes advertised to peer
+- `frr_bfd_peer_status` - BFD peer state (1=up, 0=down)
+- `frr_bfd_peer_uptime_seconds` - BFD peer uptime
+
+### Accessing Metrics
+
+```bash
+# From any host with network access
+curl http://[fd00:101::11]:9342/metrics
+
+# Check if port is listening
+talosctl -n <node-ip> read /proc/net/tcp6 | grep 247E  # 9342 in hex
+```
+
+### Prometheus Integration
+
+Configure Prometheus to scrape the metrics endpoint:
+
+```yaml
+- job_name: 'frr-exporter'
+  scrape_interval: 30s
+  static_configs:
+    - targets:
+        - 'node1-ip:9342'
+        - 'node2-ip:9342'
+```
+
+Example PromQL queries:
+
+```promql
+# BGP session health
+frr_bgp_peer_state{peer="fe80::xxx"}
+
+# Total routes per node
+sum(frr_bgp_peer_prefixes_received_count_total) by (instance)
+
+# BFD session uptime
+frr_bfd_peer_uptime_seconds
+```
 
 ## Documentation
 

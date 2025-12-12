@@ -126,82 +126,42 @@ if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then
     vtysh -c "show bfd peers" || true
 fi
 
+# Start Prometheus metrics exporter
+log "Starting Prometheus metrics exporter on port 9342"
+/usr/local/bin/frr_exporter \
+    --frr.vtysh.path=/usr/bin/vtysh \
+    --web.listen-address=:9342 \
+    --collector.bgp \
+    --collector.bfd \
+    &
+EXPORTER_PID=$!
+log "frr_exporter started (PID: $EXPORTER_PID)"
+
 # Show process list
 log "Current processes:"
-ps -ef | grep -E "(bgpd|bfdd|zebra)" || true
+ps -ef | grep -E "(bgpd|bfdd|zebra|frr_exporter)" || true
 
-# Monitoring loop with enhanced diagnostics
-MONITOR_INTERVAL=${MONITOR_INTERVAL:-300}  # 5 minutes
-MONITOR_COUNT=${MONITOR_COUNT:-5}
+# Simple monitoring loop - keep container alive and monitor process health
+log "FRR and metrics exporter running. Monitoring for process health..."
+log "Metrics available at: http://0.0.0.0:9342/metrics"
 
-count=0
 while true; do
-    if [ $count -lt ${MONITOR_COUNT} ]; then
-        log "=== Status Check ($((count + 1))/${MONITOR_COUNT}) ==="
-        echo ""
-
-        # BGP Summary with clear header
-        log "BGP Summary:"
-        vtysh -c "show bgp vrf all summary wide" || true
-        echo ""
-
-        # BGP Neighbors Detail
-        log "BGP Neighbors (IPv4):"
-        vtysh -c "show bgp ipv4 unicast neighbors" || true
-        echo ""
-
-        if [ -n "${PEER_IPV6_REMOTE}" ]; then
-            log "BGP Neighbors (IPv6):"
-            vtysh -c "show bgp ipv6 unicast neighbors" || true
-            echo ""
-        fi
-
-        # BGP Routes Advertised/Received
-        log "BGP Routes Advertised (IPv4):"
-        vtysh -c "show bgp ipv4 unicast neighbors advertised-routes" || true
-        echo ""
-
-        log "BGP Routes Received (IPv4):"
-        vtysh -c "show bgp ipv4 unicast neighbors routes" || true
-        echo ""
-
-        if [ -n "${PEER_IPV6_REMOTE}" ]; then
-            log "BGP Routes Advertised (IPv6):"
-            vtysh -c "show bgp ipv6 unicast neighbors advertised-routes" || true
-            echo ""
-
-            log "BGP Routes Received (IPv6):"
-            vtysh -c "show bgp ipv6 unicast neighbors routes" || true
-            echo ""
-        fi
-
-        # Running Configuration
-        log "Running Configuration:"
-        vtysh -c "show running-config" || true
-        echo ""
-
-        # BFD status if configured
-        if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then
-            log "BFD Peer Status:"
-            vtysh -c "show bfd peers brief" || true
-            echo ""
-        fi
-
-        # Routing table summaries
-        log "IPv4 Route Summary:"
-        vtysh -c "show ip route summary" || true
-        echo ""
-
-        if [ -n "${PEER_IPV6_REMOTE}" ]; then
-            log "IPv6 Route Summary:"
-            vtysh -c "show ipv6 route summary" || true
-            echo ""
-        fi
-
-        # Note: VRF support removed in v1.0.13 - all BGP in default VRF
-
-        count=$((count + 1))
+    # Check if critical processes are still running
+    if ! pgrep -x "bgpd" > /dev/null; then
+        log "ERROR: bgpd process died, restarting container"
+        exit 1
     fi
 
-    sleep ${MONITOR_INTERVAL}
+    if ! pgrep -x "frr_exporter" > /dev/null; then
+        log "WARNING: frr_exporter died, restarting"
+        /usr/local/bin/frr_exporter \
+            --frr.vtysh.path=/usr/bin/vtysh \
+            --web.listen-address=:9342 \
+            --collector.bgp \
+            --collector.bfd \
+            &
+        log "frr_exporter restarted (PID: $!)"
+    fi
+
+    sleep 300  # Check every 5 minutes
 done

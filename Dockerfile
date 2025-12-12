@@ -1,7 +1,14 @@
-FROM quay.io/frrouting/frr:10.4.1 AS base
+FROM quay.io/frrouting/frr:10.5.0 AS base
 
 # Install dependencies
-RUN apk add --no-cache --update-cache gettext iputils busybox-extras jq python3 py3-yaml py3-jinja2
+RUN apk add --no-cache --update-cache gettext iputils busybox-extras jq python3 py3-yaml py3-jinja2 curl
+
+# Download and install frr_exporter
+ARG FRR_EXPORTER_VERSION=1.8.0
+RUN curl -L https://github.com/tynany/frr_exporter/releases/download/v${FRR_EXPORTER_VERSION}/frr_exporter-${FRR_EXPORTER_VERSION}.linux-amd64.tar.gz | tar xzv && \
+    mv frr_exporter-${FRR_EXPORTER_VERSION}.linux-amd64/frr_exporter /usr/local/bin/frr_exporter && \
+    chmod +x /usr/local/bin/frr_exporter && \
+    rm -rf frr_exporter-${FRR_EXPORTER_VERSION}.linux-amd64
 
 # Copy configuration loader and template renderer
 COPY config_loader.py /usr/local/bin/config_loader.py
@@ -41,7 +48,7 @@ COPY manifest.yaml /tmp/manifest.yaml
 RUN apk add --no-cache yq && \
     VERSION=$(yq '.metadata.version' /tmp/manifest.yaml) && \
     echo "${VERSION}" > /etc/frr/VERSION && \
-    echo "FRR Extension ${VERSION} (FRR 10.4.1) - Talos ExtensionServiceConfig Integration" > /etc/frr/version && \
+    echo "FRR Extension ${VERSION} (FRR 10.5.0 + frr_exporter 1.8.0) - Talos ExtensionServiceConfig Integration" > /etc/frr/version && \
     apk del yq
 
 # Backup original /etc/frr for initialization on first boot (includes VERSION file)
