@@ -252,6 +252,8 @@ router bgp {{ bgp.upstream.local_asn }}
 {% endif %}
 {% if peer.update_source is defined %}
  neighbor {{ peer.address }} update-source {{ peer.update_source }}
+{% else %}
+ neighbor {{ peer.address }} update-source {{ bgp.upstream.update_source | default('ens18') }}
 {% endif %}
 {% endfor %}
 {% endif %}
