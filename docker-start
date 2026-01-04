@@ -141,17 +141,13 @@ log "frr_exporter started (PID: $EXPORTER_PID)"
 log "Current processes:"
 ps -ef | grep -E "(bgpd|bfdd|zebra|frr_exporter)" || true
 
-# Simple monitoring loop - keep container alive and monitor process health
-log "FRR and metrics exporter running. Monitoring for process health..."
+# Simple monitoring loop - keep container alive and monitor metrics exporter
+# Note: watchfrr (FRR's built-in daemon manager) handles FRR daemon monitoring and restarts
+log "FRR running under watchfrr supervision. Monitoring metrics exporter..."
 log "Metrics available at: http://0.0.0.0:9342/metrics"
 
 while true; do
-    # Check if critical processes are still running
-    if ! pgrep -x "bgpd" > /dev/null; then
-        log "ERROR: bgpd process died, restarting container"
-        exit 1
-    fi
-
+    # Only monitor the metrics exporter - let watchfrr handle FRR daemons
     if ! pgrep -x "frr_exporter" > /dev/null; then
         log "WARNING: frr_exporter died, restarting"
         /usr/local/bin/frr_exporter \

@@ -1,10 +1,11 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.0.17
+  version: v1.0.18
   author: Sulaiman Ahmad (sulibot@gmail.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
+    v1.0.18: Remove redundant bgpd monitoring - let watchfrr handle daemon restarts (fixes false alarm errors).
     v1.0.17: Add Prometheus metrics exporter (frr_exporter v1.8.0) on port 9342. Upgrade to FRR 10.5.0.
     v1.0.16: Support pre-rendered frr.conf via ExtensionServiceConfig (native Terraform workflow).
     Falls back to YAML-based template rendering for backwards compatibility.
