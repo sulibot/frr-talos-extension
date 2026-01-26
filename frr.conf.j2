@@ -229,7 +229,6 @@ router bgp {{ bgp.upstream.local_asn }}
  neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.remote_asn }}
  neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-MP-BGP
  neighbor {{ bgp.cilium.peering.ipv6.local }} update-source veth-frr
- neighbor {{ bgp.cilium.peering.ipv6.local }} passive
  neighbor {{ bgp.cilium.peering.ipv6.local }} capability extended-nexthop
  !
 {% endif %}
@@ -270,7 +269,6 @@ router bgp {{ bgp.upstream.local_asn }}
   ! Cilium neighbor receives IPv4 routes over IPv6 session (MP-BGP)
   neighbor {{ bgp.cilium.peering.ipv6.local }} activate
   neighbor {{ bgp.cilium.peering.ipv6.local }} next-hop-self
-  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap out
 {% endif %}
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
@@ -307,7 +305,6 @@ router bgp {{ bgp.upstream.local_asn }}
   ! Cilium neighbor also receives IPv6 routes (MP-BGP)
   neighbor {{ bgp.cilium.peering.ipv6.local }} activate
   neighbor {{ bgp.cilium.peering.ipv6.local }} next-hop-self
-  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap_v6 out
 {% endif %}
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
