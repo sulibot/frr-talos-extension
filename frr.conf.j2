@@ -228,6 +228,7 @@ router bgp {{ bgp.upstream.local_asn }}
  ! Single session carries both IPv4 and IPv6 routes (extended-nexthop capability)
  neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.remote_asn }}
  neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-MP-BGP
+ neighbor {{ bgp.cilium.peering.ipv6.local }} update-source veth-frr
  neighbor {{ bgp.cilium.peering.ipv6.local }} capability extended-nexthop
  !
 {% endif %}
