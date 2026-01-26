@@ -46,31 +46,23 @@ PEER_IPV6_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json'))
 PEER_IPV6_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('remote',''))")
 PEER_IPV6_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('prefix',126))")
 
-# Create network namespace
-/sbin/ip netns add ${NAMESPACE_CILIUM} || {
-    log "Network namespace ${NAMESPACE_CILIUM} already exists"
-}
-
 log "Creating veth pair: ${VETH_CILIUM} <-> ${VETH_FRR}"
 
 /sbin/ip link add ${VETH_CILIUM} type veth peer name ${VETH_FRR} || {
     log "Veth pair already exists"
 }
 
-# Move one end to the namespace
-/sbin/ip link set ${VETH_CILIUM} netns ${NAMESPACE_CILIUM} || true
-
 # Configure IPv4 addresses
 if [ -n "${PEER_IP_LOCAL}" ] && [ -n "${PEER_IP_REMOTE}" ]; then
     log "Configuring IPv4 peering: ${PEER_IP_LOCAL} <-> ${PEER_IP_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip a a ${PEER_IP_LOCAL}/${PEER_IP_PREFIX} dev ${VETH_CILIUM} || true
+    /sbin/ip a a ${PEER_IP_LOCAL}/${PEER_IP_PREFIX} dev ${VETH_CILIUM} || true
     /sbin/ip a a ${PEER_IP_REMOTE}/${PEER_IP_PREFIX} dev ${VETH_FRR} || true
 fi
 
 # Configure IPv6 addresses
 if [ -n "${PEER_IPV6_LOCAL}" ] && [ -n "${PEER_IPV6_REMOTE}" ]; then
     log "Configuring IPv6 peering: ${PEER_IPV6_LOCAL} <-> ${PEER_IPV6_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip -6 a a ${PEER_IPV6_LOCAL}/${PEER_IPV6_PREFIX} dev ${VETH_CILIUM} || true
+    /sbin/ip -6 a a ${PEER_IPV6_LOCAL}/${PEER_IPV6_PREFIX} dev ${VETH_CILIUM} || true
     /sbin/ip -6 a a ${PEER_IPV6_REMOTE}/${PEER_IPV6_PREFIX} dev ${VETH_FRR} || true
 fi
 
@@ -78,8 +70,8 @@ fi
 log "Bringing up interfaces with MTU ${INTERFACE_MTU}"
 /sbin/ip link set ${VETH_FRR} up || true
 /sbin/ip link set ${VETH_FRR} mtu ${INTERFACE_MTU} || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} up || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} || true
+/sbin/ip link set ${VETH_CILIUM} up || true
+/sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} || true
 
 # Version-based initialization
 CURRENT_VERSION=""
@@ -168,8 +160,8 @@ while true; do
     if [ $count -lt ${MONITOR_COUNT} ]; then
         log "=== Status Check (${count}/${MONITOR_COUNT}) ==="
 
-        # BGP status
-        vtysh -c "show bgp vrf all summary wide" || true
+        # BGP status (MP-BGP includes both IPv4 and IPv6)
+        vtysh -c "show bgp summary" || true
 
         # BFD status if configured
         if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then
