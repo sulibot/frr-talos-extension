@@ -1,11 +1,12 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.1.11
+  version: v1.1.12
   author: Kai Zhang (kimi.zhangkai@gmail.com), Jonathan Senecal (contact@jonathansenecal.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
     Configuration-only approach with network announcement filtering per peer.
+    v1.1.12: Revert namespace isolation (v1.1.11) - incompatible with Cilium hostNetwork=true. Keep only IPv6 loopback route-map fix.
     v1.1.11: Fix IPv6 loopback redistribution (address-family-aware route-maps) and restore namespace isolation for veth peering.
     v1.1.10: Match test VM config - use LOOPBACKS (uppercase), add BGP timers, disable SETSRC.
     v1.1.9: Remove outbound route-map for IPv6 upstream to match test VM (send all redistributed routes).

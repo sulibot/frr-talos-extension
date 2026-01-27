@@ -46,57 +46,32 @@ PEER_IPV6_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json'))
 PEER_IPV6_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('remote',''))")
 PEER_IPV6_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('prefix',126))")
 
-# ========================================
-# Fix #2: Network Namespace Isolation
-# Create namespace and move veth-cilium into it so Cilium pods can access it
-# ========================================
-
-# Create network namespace for Cilium peering
-log "Creating network namespace: ${NAMESPACE_CILIUM}"
-/sbin/ip netns add ${NAMESPACE_CILIUM} 2>/dev/null || {
-    log "Network namespace ${NAMESPACE_CILIUM} already exists"
-}
-
 log "Creating veth pair: ${VETH_CILIUM} <-> ${VETH_FRR}"
-/sbin/ip link add ${VETH_CILIUM} type veth peer name ${VETH_FRR} 2>/dev/null || {
+
+/sbin/ip link add ${VETH_CILIUM} type veth peer name ${VETH_FRR} || {
     log "Veth pair already exists"
 }
 
-# Move veth-cilium into the namespace
-log "Moving ${VETH_CILIUM} to namespace ${NAMESPACE_CILIUM}"
-/sbin/ip link set ${VETH_CILIUM} netns ${NAMESPACE_CILIUM} || true
-
-# Configure IPv4 addresses (veth-cilium in namespace, veth-frr in host)
+# Configure IPv4 addresses
 if [ -n "${PEER_IP_LOCAL}" ] && [ -n "${PEER_IP_REMOTE}" ]; then
     log "Configuring IPv4 peering: ${PEER_IP_LOCAL} <-> ${PEER_IP_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip a a ${PEER_IP_LOCAL}/${PEER_IP_PREFIX} dev ${VETH_CILIUM} 2>/dev/null || {
-        log "IPv4 already assigned to ${VETH_CILIUM}"
-    }
-    /sbin/ip a a ${PEER_IP_REMOTE}/${PEER_IP_PREFIX} dev ${VETH_FRR} 2>/dev/null || {
-        log "IPv4 already assigned to ${VETH_FRR}"
-    }
+    /sbin/ip a a ${PEER_IP_LOCAL}/${PEER_IP_PREFIX} dev ${VETH_CILIUM} || true
+    /sbin/ip a a ${PEER_IP_REMOTE}/${PEER_IP_PREFIX} dev ${VETH_FRR} || true
 fi
 
-# Configure IPv6 addresses (veth-cilium in namespace, veth-frr in host)
+# Configure IPv6 addresses
 if [ -n "${PEER_IPV6_LOCAL}" ] && [ -n "${PEER_IPV6_REMOTE}" ]; then
     log "Configuring IPv6 peering: ${PEER_IPV6_LOCAL} <-> ${PEER_IPV6_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip -6 a a ${PEER_IPV6_LOCAL}/${PEER_IPV6_PREFIX} dev ${VETH_CILIUM} 2>/dev/null || {
-        log "IPv6 already assigned to ${VETH_CILIUM}"
-    }
-    /sbin/ip -6 a a ${PEER_IPV6_REMOTE}/${PEER_IPV6_PREFIX} dev ${VETH_FRR} 2>/dev/null || {
-        log "IPv6 already assigned to ${VETH_FRR}"
-    }
+    /sbin/ip -6 a a ${PEER_IPV6_LOCAL}/${PEER_IPV6_PREFIX} dev ${VETH_CILIUM} || true
+    /sbin/ip -6 a a ${PEER_IPV6_REMOTE}/${PEER_IPV6_PREFIX} dev ${VETH_FRR} || true
 fi
 
-# Bring up interfaces (veth-cilium in namespace, veth-frr in host)
+# Bring up interfaces
 log "Bringing up interfaces with MTU ${INTERFACE_MTU}"
-/sbin/ip link set ${VETH_FRR} mtu ${INTERFACE_MTU} up || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} up || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set lo up || true
-
-log "Namespace isolation configured:"
-log "  ${VETH_FRR} (host namespace): ${PEER_IPV6_REMOTE:-${PEER_IP_REMOTE}}"
-log "  ${VETH_CILIUM} (${NAMESPACE_CILIUM} namespace): ${PEER_IPV6_LOCAL:-${PEER_IP_LOCAL}}"
+/sbin/ip link set ${VETH_FRR} up || true
+/sbin/ip link set ${VETH_FRR} mtu ${INTERFACE_MTU} || true
+/sbin/ip link set ${VETH_CILIUM} up || true
+/sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} || true
 
 # Version-based initialization
 CURRENT_VERSION=""
