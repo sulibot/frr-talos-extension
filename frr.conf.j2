@@ -112,14 +112,25 @@ route-map SETSRC permit 10
 !  set src {{ bgp.upstream.router_id_v6 }}
 ! !
 {% endif %}
-route-map loopbacks permit 10
-  match interface lo
+! ========================================
+! Fix #1: IPv6 Loopback Redistribution
+! Use address-family-aware prefix-lists instead of generic interface matching
+! This ensures both IPv4 and IPv6 loopbacks are properly redistributed
+! ========================================
+{% if bgp.upstream.router_id is defined %}
+ip prefix-list LOOPBACK-v4 seq 10 permit {{ bgp.upstream.router_id }}/32
+{% endif %}
+{% if bgp.upstream.router_id_v6 is defined %}
+ipv6 prefix-list LOOPBACK-v6 seq 10 permit {{ bgp.upstream.router_id_v6 }}/128
+{% endif %}
 !
-route-map loopbacks permit 20
-  match interface dummy0
+route-map LOOPBACKS-v4 permit 10
+  match ip address prefix-list LOOPBACK-v4
+exit
 !
-route-map loopbacks permit 30
-  match interface dummy1
+route-map LOOPBACKS-v6 permit 10
+  match ipv6 address prefix-list LOOPBACK-v6
+exit
 !
 {% if bgp.upstream.peers is defined %}
 ! Auto-generated route-maps and prefix-lists for network advertisements
@@ -223,6 +234,7 @@ router bgp {{ bgp.upstream.local_asn }}
  no bgp ebgp-requires-policy
  no bgp default ipv4-unicast
  bgp bestpath as-path multipath-relax
+ timers bgp 10 30
  !
 {% if bgp.cilium.peering.ipv6 is defined %}
  ! Local Cilium peering via MP-BGP over IPv6
@@ -298,7 +310,7 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
-  redistribute connected route-map loopbacks
+  redistribute connected route-map LOOPBACKS-v4
  exit-address-family
 
  address-family ipv6 unicast
@@ -335,10 +347,11 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
-  redistribute connected route-map loopbacks
+  redistribute connected route-map LOOPBACKS-v6
  exit-address-family
 !
-ip protocol bgp route-map SETSRC
+! SETSRC disabled - test VM doesn't use it and works fine
+! ip protocol bgp route-map SETSRC
 {% if bgp.upstream.router_id_v6 is defined %}
 ! SETSRC_V6 disabled - causes issues with loopback route redistribution
 ! ipv6 protocol bgp route-map SETSRC_V6
