@@ -250,7 +250,6 @@ router bgp {{ bgp.upstream.local_asn }}
  neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-MP-BGP
  neighbor {{ bgp.cilium.peering.ipv6.local }} update-source veth-frr
  neighbor {{ bgp.cilium.peering.ipv6.local }} capability extended-nexthop
- neighbor {{ bgp.cilium.peering.ipv6.local }} passive
  !
 {% endif %}
 {% if bgp.upstream.peers is defined %}
