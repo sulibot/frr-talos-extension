@@ -288,6 +288,7 @@ router bgp {{ bgp.upstream.local_asn }}
 {% if bgp.cilium.peering.ipv6 is defined %}
   ! Cilium neighbor receives IPv4 routes over IPv6 session (MP-BGP)
   neighbor {{ bgp.cilium.peering.ipv6.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv6.local }} passive
   neighbor {{ bgp.cilium.peering.ipv6.local }} next-hop-self
 {% endif %}
 {% if bgp.upstream.peers is defined %}
@@ -328,6 +329,7 @@ router bgp {{ bgp.upstream.local_asn }}
 {% if bgp.cilium.peering.ipv6 is defined %}
   ! Cilium neighbor also receives IPv6 routes (MP-BGP)
   neighbor {{ bgp.cilium.peering.ipv6.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv6.local }} passive
   neighbor {{ bgp.cilium.peering.ipv6.local }} next-hop-self
 {% endif %}
 {% if bgp.upstream.peers is defined %}
