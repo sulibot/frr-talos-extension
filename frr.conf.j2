@@ -239,10 +239,12 @@ router bgp {{ bgp.upstream.local_asn }}
 {% if bgp.cilium.peering.ipv6 is defined %}
  ! Local Cilium peering via MP-BGP over IPv6
  ! Single session carries both IPv4 and IPv6 routes (extended-nexthop capability)
+ ! FRR is passive to avoid iBGP connection collision with Cilium
  neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.remote_asn }}
  neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-MP-BGP
  neighbor {{ bgp.cilium.peering.ipv6.local }} update-source veth-frr
  neighbor {{ bgp.cilium.peering.ipv6.local }} capability extended-nexthop
+ neighbor {{ bgp.cilium.peering.ipv6.local }} passive
  !
 {% endif %}
 {% if bgp.upstream.peers is defined %}
