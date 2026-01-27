@@ -314,7 +314,8 @@ router bgp {{ bgp.upstream.local_asn }}
 {% if peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
-{% if peer.route_map_out is defined %}
+  ! IPv6: No outbound route-map - redistribute all loopbacks like test VM
+{% if false and peer.route_map_out is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_out }} out
 {% elif peer.advertise_networks is defined and peer.advertise_networks %}
   ! Using automatic route-map for network advertisements
