@@ -7,6 +7,8 @@ RUN apk add --no-cache --update-cache gettext iputils busybox-extras jq python3 
 COPY config_loader.py /usr/local/bin/config_loader.py
 COPY render_template.py /usr/local/bin/render_template.py
 RUN chmod +x /usr/local/bin/config_loader.py /usr/local/bin/render_template.py
+COPY dump-bgp-state.sh /usr/local/bin/dump-bgp-state.sh
+RUN chmod +x /usr/local/bin/dump-bgp-state.sh
 
 # Copy default configuration template
 COPY examples/config-bfd.yaml /etc/frr/config.default.yaml

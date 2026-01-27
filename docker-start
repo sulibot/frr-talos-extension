@@ -141,6 +141,10 @@ log "Starting FRR daemons (including BFD if enabled)"
 # Wait for daemons to start
 sleep 5
 
+# Dump Cilium neighbor FSM state for troubleshooting
+log "Dumping Cilium neighbor FSM state"
+/usr/local/bin/dump-bgp-state.sh || true
+
 # Check BFD status if configured
 if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then
     log "Checking BFD daemon status"

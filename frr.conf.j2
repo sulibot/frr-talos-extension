@@ -114,24 +114,30 @@ route-map SETSRC permit 10
 {% endif %}
 ! ========================================
 ! Fix #1: IPv6 Loopback Redistribution
-! Use address-family-aware prefix-lists instead of generic interface matching
-! This ensures both IPv4 and IPv6 loopbacks are properly redistributed
+! Use address-family-aware, per-node prefix-lists instead of generic interface matching
+! This ensures each node advertises its own loopback addresses
 ! ========================================
-{% if bgp.upstream.router_id is defined %}
-ip prefix-list LOOPBACK-v4 seq 10 permit {{ bgp.upstream.router_id }}/32
+{% set loopback_ipv4 = bgp.upstream.loopbacks.ipv4 if bgp.upstream.loopbacks is defined and bgp.upstream.loopbacks.ipv4 is defined else bgp.upstream.router_id %}
+{% set loopback_ipv6 = bgp.upstream.loopbacks.ipv6 if bgp.upstream.loopbacks is defined and bgp.upstream.loopbacks.ipv6 is defined else bgp.upstream.router_id_v6 %}
+{% if loopback_ipv4 is defined %}
+ip prefix-list LOOPBACK-self-v4 seq 10 permit {{ loopback_ipv4 }}/32
 {% endif %}
-{% if bgp.upstream.router_id_v6 is defined %}
-ipv6 prefix-list LOOPBACK-v6 seq 10 permit {{ bgp.upstream.router_id_v6 }}/128
+{% if loopback_ipv6 is defined %}
+ipv6 prefix-list LOOPBACK-self-v6 seq 10 permit {{ loopback_ipv6 }}/128
 {% endif %}
 !
-route-map LOOPBACKS-v4 permit 10
-  match ip address prefix-list LOOPBACK-v4
+{% if loopback_ipv4 is defined %}
+route-map LOOPBACKS-self-v4 permit 10
+  match ip address prefix-list LOOPBACK-self-v4
 exit
 !
-route-map LOOPBACKS-v6 permit 10
-  match ipv6 address prefix-list LOOPBACK-v6
+{% endif %}
+{% if loopback_ipv6 is defined %}
+route-map LOOPBACKS-self-v6 permit 10
+  match ipv6 address prefix-list LOOPBACK-self-v6
 exit
 !
+{% endif %}
 {% if bgp.upstream.peers is defined %}
 ! Auto-generated route-maps and prefix-lists for network advertisements
 {% for peer in bgp.upstream.peers %}
@@ -312,7 +318,11 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
-  redistribute connected route-map LOOPBACKS-v4
+{% if loopback_ipv4 is defined %}
+  redistribute connected route-map LOOPBACKS-self-v4
+{% else %}
+  redistribute connected
+{% endif %}
  exit-address-family
 
  address-family ipv6 unicast
@@ -349,7 +359,11 @@ router bgp {{ bgp.upstream.local_asn }}
   network {{ network }}
 {% endfor %}
 {% endif %}
-  redistribute connected route-map LOOPBACKS-v6
+{% if loopback_ipv6 is defined %}
+  redistribute connected route-map LOOPBACKS-self-v6
+{% else %}
+  redistribute connected
+{% endif %}
  exit-address-family
 !
 ! SETSRC disabled - test VM doesn't use it and works fine
