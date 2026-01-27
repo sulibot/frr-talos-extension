@@ -107,9 +107,10 @@ route-map SETSRC permit 10
  set src {{ bgp.upstream.router_id }}
 !
 {% if bgp.upstream.router_id_v6 is defined %}
-route-map SETSRC_V6 permit 10
- set src {{ bgp.upstream.router_id_v6 }}
-!
+! SETSRC_V6 disabled - causes issues with loopback route redistribution
+! route-map SETSRC_V6 permit 10
+!  set src {{ bgp.upstream.router_id_v6 }}
+! !
 {% endif %}
 route-map loopbacks permit 10
   match interface lo
@@ -338,7 +339,8 @@ router bgp {{ bgp.upstream.local_asn }}
 !
 ip protocol bgp route-map SETSRC
 {% if bgp.upstream.router_id_v6 is defined %}
-ipv6 protocol bgp route-map SETSRC_V6
+! SETSRC_V6 disabled - causes issues with loopback route redistribution
+! ipv6 protocol bgp route-map SETSRC_V6
 {% endif %}
 !
 line vty
