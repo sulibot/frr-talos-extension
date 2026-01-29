@@ -1,11 +1,12 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.1.41
+  version: v1.1.42
   author: Kai Zhang (kimi.zhangkai@gmail.com), Jonathan Senecal (contact@jonathansenecal.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
     FRR now shares the host network namespace (hostNetwork=true) and trusts Cilium as the source of prefixes while still emitting node loopbacks via Terraform-driven prefix-lists.
+    v1.1.42: Fix loopback prefix-list syntax - add /32 and /128 prefix lengths to host addresses.
     v1.1.41: Replace MP-BGP with dual-stack traditional BGP - separate IPv4/IPv6 sessions for better Cilium compatibility.
     v1.1.40: Remove invalid passive directives from address-family blocks - passive is neighbor-level only, not valid inside address-families.
     v1.1.39: Fix Cilium neighbor template - use bgp.cilium.peering.ipv6 config paths consistently.

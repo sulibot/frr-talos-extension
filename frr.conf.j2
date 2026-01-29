@@ -125,7 +125,7 @@ route-map SETSRC permit 10
 {% endif %}
 {% if loopback_ips_v4 %}
 {% for addr in loopback_ips_v4 %}
-ip prefix-list LOOPBACK-self-v4 seq {{ 10 + loop.index0 }} permit {{ addr }}
+ip prefix-list LOOPBACK-self-v4 seq {{ 10 + loop.index0 }} permit {{ addr }}/32
 {% endfor %}
 {% endif %}
 {% set loopback_ips_v6 = [] %}
@@ -136,7 +136,7 @@ ip prefix-list LOOPBACK-self-v4 seq {{ 10 + loop.index0 }} permit {{ addr }}
 {% endif %}
 {% if loopback_ips_v6 %}
 {% for addr in loopback_ips_v6 %}
-ipv6 prefix-list LOOPBACK-self-v6 seq {{ 10 + loop.index0 }} permit {{ addr }}
+ipv6 prefix-list LOOPBACK-self-v6 seq {{ 10 + loop.index0 }} permit {{ addr }}/128
 {% endfor %}
 {% endif %}
 !
