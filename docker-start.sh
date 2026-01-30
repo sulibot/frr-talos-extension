@@ -106,46 +106,19 @@ nsenter -t ${HOST_NS_PID} -n /sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MT
 
 log "Network setup complete."
 
-# Version-based initialization
-CURRENT_VERSION=""
-if [ -f /etc/frr.defaults/VERSION ]; then
-    CURRENT_VERSION=$(cat /etc/frr.defaults/VERSION)
-    log "Container version: ${CURRENT_VERSION}"
-fi
+# --- Filesystem Setup ---
+# The rootfs is read-only. We need /etc/frr to be writable for config generation.
+# We use a tmpfs overlay to avoid dependencies on the host filesystem.
+log "Mounting tmpfs on /etc/frr"
+mount -t tmpfs -o size=8M tmpfs /etc/frr
 
-INSTALLED_VERSION=""
-if [ -f /etc/frr/.initialized ]; then
-    INSTALLED_VERSION=$(cat /etc/frr/.initialized 2>/dev/null || echo "")
-    log "Installed version: ${INSTALLED_VERSION}"
+# Populate /etc/frr with default files from the image
+if [ -d /etc/frr.defaults ]; then
+    log "Populating /etc/frr from /etc/frr.defaults"
+    cp -a /etc/frr.defaults/* /etc/frr/
 else
-    log "No initialized marker found (first boot)"
-fi
-
-# Initialize or update if version mismatch or first boot
-if [ "$CURRENT_VERSION" != "$INSTALLED_VERSION" ] || [ ! -f /etc/frr/.initialized ]; then
-    if [ -z "$INSTALLED_VERSION" ]; then
-        log "Initializing /etc/frr directory (first boot)"
-    else
-        log "Version mismatch detected (${INSTALLED_VERSION} -> ${CURRENT_VERSION})"
-        log "Updating template and configuration files..."
-    fi
-
-    # Copy defaults from backup to mounted directory
-    # Important: Copy template and daemons, but preserve frr.conf if it exists
+    log "WARNING: /etc/frr.defaults not found, creating minimal setup"
     mkdir -p /etc/frr
-    cp /etc/frr.defaults/frr.conf.j2 /etc/frr/frr.conf.j2 2>/dev/null || true
-    cp /etc/frr.defaults/daemons /etc/frr/daemons 2>/dev/null || true
-    cp /etc/frr.defaults/vtysh.conf /etc/frr/vtysh.conf 2>/dev/null || true
-    cp /etc/frr.defaults/version /etc/frr/version 2>/dev/null || true
-
-    # Write version to .initialized
-    echo "${CURRENT_VERSION}" > /etc/frr/.initialized
-    log "Initialized marker updated to version: ${CURRENT_VERSION}"
-fi
-
-# Ensure daemons file exists
-if [ ! -f /etc/frr/daemons ]; then
-    cp /etc/frr.defaults/daemons /etc/frr/daemons
 fi
 
 # Generate FRR configuration
