@@ -121,6 +121,28 @@ else
     mkdir -p /etc/frr
 fi
 
+# --- Fix for FRR Daemons (Writable /var paths) ---
+# FRR daemons need to write PID files, sockets, and logs.
+# Since the rootfs is read-only, we mount tmpfs over these specific directories.
+log "Mounting tmpfs for FRR runtime directories"
+for dir in /var/run/frr /var/lib/frr /var/log/frr; do
+    # Check if directory exists (it should in standard FRR images)
+    if [ -d "$dir" ]; then
+        log "Mounting tmpfs on $dir"
+        mount -t tmpfs -o size=8M,noatime,mode=0755 tmpfs "$dir"
+        chown frr:frr "$dir"
+    else
+        # If directory doesn't exist, try to create it (in case parent is writable)
+        if mkdir -p "$dir" 2>/dev/null; then
+            log "Created $dir, mounting tmpfs..."
+            mount -t tmpfs -o size=8M,noatime,mode=0755 tmpfs "$dir"
+            chown frr:frr "$dir"
+        else
+            log "WARNING: Directory $dir does not exist and cannot be created (parent read-only). Daemon startup may fail."
+        fi
+    fi
+done
+
 # Generate FRR configuration
 log "Generating FRR configuration from template: ${FRR_TEMPLATE}"
 
