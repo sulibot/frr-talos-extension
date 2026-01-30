@@ -16,14 +16,34 @@ container:
   # Use hostPID to allow accessing host network namespace via nsenter
   hostPID: true
   mounts:
-    - source: /var/lib/frr
+    # Mount writable directories from host /run (tmpfs) into container
+    # /run is always writable in Talos, unlike /var/* which is read-only
+    - source: /run/frr-etc
       destination: /etc/frr
       type: bind
       options:
         - bind
         - rw
-    - source: /var/run/frr
+    - source: /run/frr
       destination: /var/run/frr
+      type: bind
+      options:
+        - bind
+        - rw
+    - source: /run/frr-tmp
+      destination: /var/tmp/frr
+      type: bind
+      options:
+        - bind
+        - rw
+    - source: /run/frr-lib
+      destination: /var/lib/frr
+      type: bind
+      options:
+        - bind
+        - rw
+    - source: /run/frr-log
+      destination: /var/log/frr
       type: bind
       options:
         - bind
