@@ -167,6 +167,16 @@ chown -R frr:frr /etc/frr || true
 log "Starting syslogd"
 syslogd -n -O - &
 
+# Create writable directories for FRR in /run (tmpfs)
+log "Creating writable FRR runtime directories"
+mkdir -p /run/frr /run/frr-tmp /run/frr-lib
+# Create symlinks so FRR can write to these locations
+ln -sf /run/frr /var/run/frr 2>/dev/null || true
+ln -sf /run/frr-tmp /var/tmp/frr 2>/dev/null || true
+ln -sf /run/frr-lib /var/lib/frr 2>/dev/null || true
+# Set proper permissions
+chmod 755 /run/frr /run/frr-tmp /run/frr-lib
+
 # Start FRR
 log "Starting FRR daemons (including BFD if enabled)"
 /usr/lib/frr/frrinit.sh start

@@ -1,10 +1,11 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.6.8
+  version: v1.6.9
   author: Kai Zhang (kimi.zhangkai@gmail.com), Jonathan Senecal (contact@jonathansenecal.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
+    v1.6.9: Create writable FRR runtime directories (/var/run/frr, /var/tmp/frr, /var/lib/frr) in /run tmpfs - fixes daemon startup failures.
     v1.6.8: Fix read-only filesystem error - use /run/config.json instead of /tmp/config.json for config storage.
     v1.6.7: Add IPv4 veth address configuration for dual-stack Cilium BGP peering. Enables both IPv4 and IPv6 peering sessions with Cilium.
     v1.6.6: Re-enable network namespace isolation using unshare. Now that Dockerfile structure is fixed, this will correctly isolate FRR from the host network.
