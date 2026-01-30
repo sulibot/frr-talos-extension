@@ -1,10 +1,11 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.7.1
+  version: v1.7.2
   author: Kai Zhang (kimi.zhangkai@gmail.com), Jonathan Senecal (contact@jonathansenecal.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
+    v1.7.2: Remove unnecessary bind mount code from docker-start.sh. Host mounts via frr.yaml handle writable paths.
     v1.7.1: Mount writable /run directories from host into container. Fixes daemon startup by providing writable filesystem paths.
     v1.7.0: Use bind mounts instead of symlinks for writable directories. Handles /var/run/frr, /var/tmp/frr, /var/lib/frr, /var/log/frr.
     v1.6.9: Create writable FRR runtime directories (/var/run/frr, /var/tmp/frr, /var/lib/frr) in /run tmpfs - fixes daemon startup failures.
