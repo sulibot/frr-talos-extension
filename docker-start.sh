@@ -169,13 +169,18 @@ syslogd -n -O - &
 
 # Create writable directories for FRR in /run (tmpfs)
 log "Creating writable FRR runtime directories"
-mkdir -p /run/frr /run/frr-tmp /run/frr-lib
-# Create symlinks so FRR can write to these locations
-ln -sf /run/frr /var/run/frr 2>/dev/null || true
-ln -sf /run/frr-tmp /var/tmp/frr 2>/dev/null || true
-ln -sf /run/frr-lib /var/lib/frr 2>/dev/null || true
-# Set proper permissions
-chmod 755 /run/frr /run/frr-tmp /run/frr-lib
+mkdir -p /run/frr /run/frr-tmp /run/frr-lib /run/frr-log
+chmod 755 /run/frr /run/frr-tmp /run/frr-lib /run/frr-log
+
+# Create target directories if they don't exist (may fail if read-only, that's ok)
+mkdir -p /var/run/frr /var/tmp/frr /var/lib/frr /var/log/frr 2>/dev/null || true
+
+# Use bind mounts to overlay writable directories over read-only ones
+log "Bind mounting writable directories"
+mount --bind /run/frr /var/run/frr 2>/dev/null || log "Warning: Could not bind mount /var/run/frr"
+mount --bind /run/frr-tmp /var/tmp/frr 2>/dev/null || log "Warning: Could not bind mount /var/tmp/frr"
+mount --bind /run/frr-lib /var/lib/frr 2>/dev/null || log "Warning: Could not bind mount /var/lib/frr"
+mount --bind /run/frr-log /var/log/frr 2>/dev/null || log "Warning: Could not bind mount /var/log/frr"
 
 # Start FRR
 log "Starting FRR daemons (including BFD if enabled)"
