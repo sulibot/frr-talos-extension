@@ -7,10 +7,14 @@ depends:
       - etcfiles
   - configuration: true
 container:
+  # Use the rootfs provided by the extension itself
+  rootfs: /usr/local/lib/containers/frr
   entrypoint: /sbin/tini
   args:
     - --
     - /usr/lib/frr/docker-start
+  # Use hostPID to allow accessing host network namespace via nsenter
+  hostPID: true
   mounts:
     - source: /var/lib/frr
       destination: /etc/frr
@@ -19,7 +23,7 @@ container:
         - bind
         - rw
     - source: /var/run/frr
-      destination: /tmp
+      destination: /var/run/frr
       type: bind
       options:
         - bind

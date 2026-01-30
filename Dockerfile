@@ -1,51 +1,55 @@
-FROM quay.io/frrouting/frr:10.4.1 AS base
+# Stage 1: Build the FRR container with custom scripts
+FROM quay.io/frrouting/frr:10.4.1 AS frr-build
 
-# Install dependencies
-RUN apk add --no-cache --update-cache gettext iputils busybox-extras jq python3 py3-yaml py3-jinja2
+# Install dependencies for config loader
+RUN apk add --no-cache --update-cache python3 py3-yaml py3-jinja2 util-linux
 
-# Copy configuration loader and template renderer
+# Copy custom scripts
 COPY config_loader.py /usr/local/bin/config_loader.py
 COPY render_template.py /usr/local/bin/render_template.py
-RUN chmod +x /usr/local/bin/config_loader.py /usr/local/bin/render_template.py
 COPY dump-bgp-state.sh /usr/local/bin/dump-bgp-state.sh
-RUN chmod +x /usr/local/bin/dump-bgp-state.sh
+RUN chmod +x /usr/local/bin/config_loader.py /usr/local/bin/render_template.py /usr/local/bin/dump-bgp-state.sh
 
-# Copy default configuration template
+# Copy configuration templates
 COPY examples/config-bfd.yaml /etc/frr/config.default.yaml
-
-# Copy FRR template
 COPY frr.conf.j2 /etc/frr/frr.conf.j2
 
-# No environment variables needed - everything comes from config files
-
 # Copy startup script
-COPY docker-start /usr/lib/frr/docker-start
+COPY docker-start.sh /usr/lib/frr/docker-start
 RUN chmod 755 /usr/lib/frr/docker-start
 
-# Copy FRR daemon configuration with BFD enabled
+# Copy daemons config
 COPY daemons /etc/frr/daemons
 
-# Ensure BFD daemon is enabled
-RUN sed -i 's/^bfdd=.*/bfdd=true/' /etc/frr/daemons || echo "bfdd=true" >> /etc/frr/daemons
-RUN sed -i 's/^bfdd_options=.*/bfdd_options="-A 127.0.0.1"/' /etc/frr/daemons || echo 'bfdd_options="-A 127.0.0.1"' >> /etc/frr/daemons
-
-# Create directory for local config overrides
+# Create config directory
 RUN mkdir -p /etc/frr/config.d
 
-# Copy manifest to extract version
-COPY manifest.yaml /tmp/manifest.yaml
-
-# Extract version from manifest and create VERSION file
-RUN apk add --no-cache yq && \
-    VERSION=$(yq '.metadata.version' /tmp/manifest.yaml) && \
-    echo "${VERSION}" > /etc/frr/VERSION && \
-    echo "FRR Extension ${VERSION} (FRR 10.4.1) - Talos ExtensionServiceConfig Integration" > /etc/frr/version && \
-    apk del yq
-
-# Backup original /etc/frr for initialization on first boot (includes VERSION file)
+# Backup /etc/frr for initialization
 RUN cp -r /etc/frr /etc/frr.defaults
 
-FROM scratch AS frr
-COPY --from=base / /rootfs/usr/local/lib/containers/frr/
+# Stage 2: Prepare the extension rootfs
+FROM alpine:3.19 AS builder
+
+WORKDIR /rootfs
+
+# Create directory structure
+RUN mkdir -p usr/local/etc/containers \
+             usr/local/share/talos/extensions/frr \
+             usr/local/lib/containers/frr
+
+# Copy the FRR container image (from Stage 1) to the extension location
+# This effectively "packages" the container inside the extension
+COPY --from=frr-build / /rootfs/usr/local/lib/containers/frr/
+
+# Copy Talos configuration files
 COPY frr.yaml /rootfs/usr/local/etc/containers/frr.yaml
+COPY manifest.yaml /rootfs/usr/local/share/talos/extensions/frr/manifest.yaml
+
+# Stage 3: Create the final extension image
+FROM scratch
+
+# Copy the prepared rootfs to the root of the scratch image
+COPY --from=builder /rootfs /rootfs
+
+# CRITICAL: Manifest must be at root level for Talos validation
 COPY manifest.yaml /manifest.yaml

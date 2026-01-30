@@ -107,51 +107,19 @@ route-map SETSRC permit 10
  set src {{ bgp.upstream.router_id }}
 !
 {% if bgp.upstream.router_id_v6 is defined %}
-! SETSRC_V6 disabled - causes issues with loopback route redistribution
-! route-map SETSRC_V6 permit 10
-!  set src {{ bgp.upstream.router_id_v6 }}
-! !
-{% endif %}
-! ========================================
-! Fix #1: IPv6 Loopback Redistribution
-! Use address-family-aware, per-node prefix-lists instead of generic interface matching
-! This ensures each node advertises its own loopback addresses
-! ========================================
-{% set loopback_ips_v4 = [] %}
-{% if bgp.upstream.loopback_addresses is defined and bgp.upstream.loopback_addresses.ipv4 is defined %}
-{% set loopback_ips_v4 = bgp.upstream.loopback_addresses.ipv4 %}
-{% elif bgp.upstream.loopbacks is defined and bgp.upstream.loopbacks.ipv4 is defined %}
-{% set loopback_ips_v4 = [bgp.upstream.loopbacks.ipv4] %}
-{% endif %}
-{% if loopback_ips_v4 %}
-{% for addr in loopback_ips_v4 %}
-ip prefix-list LOOPBACK-self-v4 seq {{ 10 + loop.index0 }} permit {{ addr }}/32
-{% endfor %}
-{% endif %}
-{% set loopback_ips_v6 = [] %}
-{% if bgp.upstream.loopback_addresses is defined and bgp.upstream.loopback_addresses.ipv6 is defined %}
-{% set loopback_ips_v6 = bgp.upstream.loopback_addresses.ipv6 %}
-{% elif bgp.upstream.loopbacks is defined and bgp.upstream.loopbacks.ipv6 is defined %}
-{% set loopback_ips_v6 = [bgp.upstream.loopbacks.ipv6] %}
-{% endif %}
-{% if loopback_ips_v6 %}
-{% for addr in loopback_ips_v6 %}
-ipv6 prefix-list LOOPBACK-self-v6 seq {{ 10 + loop.index0 }} permit {{ addr }}/128
-{% endfor %}
-{% endif %}
-!
-{% if loopback_ips_v4 %}
-route-map LOOPBACKS-self-v4 permit 10
-  match ip address prefix-list LOOPBACK-self-v4
-exit
+route-map SETSRC_V6 permit 10
+ set src {{ bgp.upstream.router_id_v6 }}
 !
 {% endif %}
-{% if loopback_ips_v6 %}
-route-map LOOPBACKS-self-v6 permit 10
-  match ipv6 address prefix-list LOOPBACK-self-v6
-exit
+route-map loopbacks permit 10
+  match interface lo
 !
-{% endif %}
+route-map loopbacks permit 20
+  match interface dummy0
+!
+route-map loopbacks permit 30
+  match interface dummy1
+!
 {% if bgp.upstream.peers is defined %}
 ! Auto-generated route-maps and prefix-lists for network advertisements
 {% for peer in bgp.upstream.peers %}
@@ -240,13 +208,48 @@ route-map ADVERTISE_V6_{{ peer_index }} deny 20
 {% endfor %}
 {% endif %}
 
-! ========================================
-! Dual-Stack Traditional BGP Configuration Note
-! ========================================
-! Cilium peering uses traditional dual-stack BGP: separate IPv4 and IPv6 sessions
-! - IPv4 session: carries IPv4 LoadBalancer routes
-! - IPv6 session: carries IPv6 LoadBalancer routes
-! This provides better compatibility between Cilium's GoBGP and FRR
+! BGP Configuration for Cilium peering (VRF)
+router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.cilium.namespace }}{% endif %}
+
+ bgp router-id {{ bgp.upstream.router_id }}
+ no bgp ebgp-requires-policy
+ no bgp default ipv4-unicast
+
+ ! Cilium peer configuration
+{% if bgp.cilium.peering.ipv4 is defined %}
+ neighbor {{ bgp.cilium.peering.ipv4.local }} remote-as {{ bgp.cilium.remote_asn }}
+ neighbor {{ bgp.cilium.peering.ipv4.local }} description Cilium-BGP-Control-Plane
+ neighbor {{ bgp.cilium.peering.ipv4.local }} passive
+{% endif %}
+
+ address-family ipv4 unicast
+{% if bgp.cilium.peering.ipv4 is defined %}
+  neighbor {{ bgp.cilium.peering.ipv4.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv4.local }} route-map denymap out
+{% endif %}
+ exit-address-family
+
+{% if bgp.cilium.peering.ipv6 is defined %}
+ neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.remote_asn }}
+ neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-BGP-Control-Plane-IPv6
+ neighbor {{ bgp.cilium.peering.ipv6.local }} passive
+ neighbor {{ bgp.cilium.peering.ipv6.local }} capability extended-nexthop
+{% endif %}
+
+ address-family ipv4 unicast
+{% if bgp.cilium.peering.ipv6 is defined %}
+  neighbor {{ bgp.cilium.peering.ipv6.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap out
+  neighbor {{ bgp.cilium.peering.ipv6.local }} extended-nexthop
+{% endif %}
+ exit-address-family
+
+{% if bgp.cilium.peering.ipv6 is defined %}
+ address-family ipv6 unicast
+  neighbor {{ bgp.cilium.peering.ipv6.local }} activate
+  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap_v6 out
+ exit-address-family
+{% endif %}
 !
 
 ! BGP Configuration for upstream fabric peering
@@ -255,8 +258,7 @@ router bgp {{ bgp.upstream.local_asn }}
  no bgp ebgp-requires-policy
  no bgp default ipv4-unicast
  bgp bestpath as-path multipath-relax
- timers bgp 10 30
- !
+
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
  ! Peer: {{ peer.description | default(peer.address) }}
@@ -282,46 +284,16 @@ router bgp {{ bgp.upstream.local_asn }}
 {% if peer.update_source is defined %}
  neighbor {{ peer.address }} update-source {{ peer.update_source }}
 {% endif %}
-{% if peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop %}
- neighbor {{ peer.address }} capability extended-nexthop
-{% endif %}
 {% endfor %}
-{% endif %}
-{% if bgp.cilium is defined and bgp.cilium.peering is defined %}
-{% if bgp.cilium.peering.ipv4 is defined %}
- !
- ! Cilium BGP Peer IPv4 (passive - Cilium initiates the connection)
- ! Cilium connects from {{ bgp.cilium.peering.ipv4.local }} to FRR at {{ bgp.cilium.peering.ipv4.remote }}
- neighbor {{ bgp.cilium.peering.ipv4.local }} remote-as {{ bgp.cilium.local_asn }}
- neighbor {{ bgp.cilium.peering.ipv4.local }} description Cilium BGP IPv4
- neighbor {{ bgp.cilium.peering.ipv4.local }} update-source {{ bgp.cilium.peering.ipv4.remote }}
- neighbor {{ bgp.cilium.peering.ipv4.local }} passive
-{% endif %}
-{% if bgp.cilium.peering.ipv6 is defined %}
- !
- ! Cilium BGP Peer IPv6 (passive - Cilium initiates the connection)
- ! Cilium connects from {{ bgp.cilium.peering.ipv6.local }} to FRR at {{ bgp.cilium.peering.ipv6.remote }}
- neighbor {{ bgp.cilium.peering.ipv6.local }} remote-as {{ bgp.cilium.local_asn }}
- neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium BGP IPv6
- neighbor {{ bgp.cilium.peering.ipv6.local }} update-source {{ bgp.cilium.peering.ipv6.remote }}
- neighbor {{ bgp.cilium.peering.ipv6.local }} passive
-{% endif %}
 {% endif %}
 
  ! Address families
-address-family ipv4 unicast
-{% if bgp.cilium.peering.ipv4 is defined %}
-  ! Cilium neighbor receives IPv4 routes over IPv4 session
-  neighbor {{ bgp.cilium.peering.ipv4.local }} activate
-  neighbor {{ bgp.cilium.peering.ipv4.local }} next-hop-self
-{% endif %}
+ address-family ipv4 unicast
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
-{% if peer.address_family is not defined or peer.address_family == 'ipv4' or (peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
+{% if peer.address_family is not defined or peer.address_family == 'ipv4' %}
   neighbor {{ peer.address }} activate
-{% if peer.route_map_in_v4 is defined %}
-  neighbor {{ peer.address }} route-map {{ peer.route_map_in_v4 }} in
-{% elif peer.route_map_in is defined %}
+{% if peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
 {% if peer.route_map_out is defined %}
@@ -344,30 +316,16 @@ address-family ipv4 unicast
   network {{ network }}
 {% endfor %}
 {% endif %}
-{% if loopback_ipv4 is defined %}
-  ! Advertise loopback directly via network statement (doesn't require route in RIB)
-  network {{ loopback_ipv4 }}/32
-{% endif %}
-{% if loopback_ipv4 is defined %}
-  redistribute connected route-map LOOPBACKS-self-v4
-{% else %}
-  redistribute connected
-{% endif %}
+  redistribute connected route-map loopbacks
+  import vrf {{ bgp.cilium.namespace }}
  exit-address-family
 
-address-family ipv6 unicast
-{% if bgp.cilium.peering.ipv6 is defined %}
-  ! Cilium neighbor receives IPv6 routes over IPv6 session
-  neighbor {{ bgp.cilium.peering.ipv6.local }} activate
-  neighbor {{ bgp.cilium.peering.ipv6.local }} next-hop-self
-{% endif %}
+ address-family ipv6 unicast
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family == 'ipv6' %}
   neighbor {{ peer.address }} activate
-{% if peer.route_map_in_v6 is defined %}
-  neighbor {{ peer.address }} route-map {{ peer.route_map_in_v6 }} in
-{% elif peer.route_map_in is defined %}
+{% if peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
 {% if peer.route_map_out is defined %}
@@ -390,18 +348,13 @@ address-family ipv6 unicast
   network {{ network }}
 {% endfor %}
 {% endif %}
-{% if loopback_ipv6 is defined %}
-  redistribute connected route-map LOOPBACKS-self-v6
-{% else %}
-  redistribute connected
-{% endif %}
+  redistribute connected route-map loopbacks
+  import vrf {{ bgp.cilium.namespace }}
  exit-address-family
 !
-! SETSRC disabled - test VM doesn't use it and works fine
-! ip protocol bgp route-map SETSRC
+ip protocol bgp route-map SETSRC
 {% if bgp.upstream.router_id_v6 is defined %}
-! SETSRC_V6 disabled - causes issues with loopback route redistribution
-! ipv6 protocol bgp route-map SETSRC_V6
+ipv6 protocol bgp route-map SETSRC_V6
 {% endif %}
 !
 line vty
