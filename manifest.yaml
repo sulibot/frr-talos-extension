@@ -1,10 +1,11 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.7.7
+  version: v1.7.8
   author: Kai Zhang (kimi.zhangkai@gmail.com), Jonathan Senecal (contact@jonathansenecal.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
+    v1.7.8: Remove network namespace isolation - run FRR in host network (hostNetwork: true). Fixes upstream BGP peering to PVE and Cilium peering by eliminating network isolation that prevented all connectivity.
     v1.7.7: Fix MP-BGP for upstream peers - remove invalid 'neighbor extended-nexthop' syntax, remove incomplete 'import vrf' directives, fix IPv6 address-family activation for MP-BGP peers. Enables upstream BGP peering with PVE VRF.
     v1.7.6: Add tmpfs mounts for /var/run/frr, /var/lib/frr, /var/log/frr - fixes FRR daemon startup (PID files, sockets, logs).
     v1.7.5: Use tmpfs overlay for /etc/frr - makes config directory writable in-memory without host mounts. Removes unnecessary version tracking.

@@ -16,106 +16,93 @@ python3 /usr/local/bin/config_loader.py --validate || {
     exit 1
 }
 
-# Generate JSON context for j2cli
 log "Generating configuration context"
 python3 /usr/local/bin/config_loader.py --json > /tmp/config.json
 CONFIG_SOURCE="/tmp/config.json"
 
 log "Configuration loaded from: ${CONFIG_SOURCE}"
 
-# Use the FRR multi-peer template
 FRR_TEMPLATE="/etc/frr/frr.conf.j2"
 log "Using FRR template: ${FRR_TEMPLATE}"
 
-# Extract network configuration from config file
-log "Setting up network namespace for Cilium BGP peering"
+log "Setting up network with namespace isolation"
 
-# Extract values from JSON config
-NAMESPACE_CILIUM=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('namespace','cilium'))")
+# --- Extract network configuration from JSON ---
 VETH_FRR=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('network',{}).get('veth_names',{}).get('frr_side','veth-frr'))")
 VETH_CILIUM=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('network',{}).get('veth_names',{}).get('cilium_side','veth-cilium'))")
 INTERFACE_MTU=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('network',{}).get('interface_mtu',1500))")
 
-# Extract peering IPs
-PEER_IP_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv4',{}).get('local',''))")
-PEER_IP_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv4',{}).get('remote',''))")
-PEER_IP_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv4',{}).get('prefix',31))")
+# Cilium peering IPs (MP-BGP over IPv6)
+CILIUM_PEER_IPV6_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('local',''))")
+CILIUM_PEER_IPV6_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('remote',''))")
+CILIUM_PEER_IPV6_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('prefix',126))")
 
-# Extract IPv6 if present
-PEER_IPV6_LOCAL=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('local',''))")
-PEER_IPV6_REMOTE=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('remote',''))")
-PEER_IPV6_PREFIX=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(c.get('bgp',{}).get('cilium',{}).get('peering',{}).get('ipv6',{}).get('prefix',126))")
+# Host loopback IPs to mirror
+LOOPBACK_IPS_V4=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(' '.join(c.get('bgp',{}).get('upstream',{}).get('loopback_addresses',{}).get('ipv4',[])))")
+LOOPBACK_IPS_V6=$(python3 -c "import json; c=json.load(open('/tmp/config.json')); print(' '.join(c.get('bgp',{}).get('upstream',{}).get('loopback_addresses',{}).get('ipv6',[])))")
 
-# Create network namespace
-/sbin/ip netns add ${NAMESPACE_CILIUM} || {
-    log "Network namespace ${NAMESPACE_CILIUM} already exists"
-}
+# --- Mirror Host Loopbacks into FRR Namespace ---
+log "Mirroring host loopback addresses into FRR namespace"
+if ! /sbin/ip link show dummy0 >/dev/null 2>&1; then
+    log "Creating dummy0 interface"
+    /sbin/ip link add dummy0 type dummy
+fi
+/sbin/ip link set dummy0 up
 
-log "Creating veth pair: ${VETH_CILIUM} <-> ${VETH_FRR}"
+for ip in $LOOPBACK_IPS_V4; do
+    log "Adding IPv4 loopback ${ip}/32 to dummy0"
+    /sbin/ip addr add "${ip}/32" dev dummy0 || true
+done
 
-/sbin/ip link add ${VETH_CILIUM} type veth peer name ${VETH_FRR} || {
-    log "Veth pair already exists"
-}
+for ip in $LOOPBACK_IPS_V6; do
+    log "Adding IPv6 loopback ${ip}/128 to dummy0"
+    /sbin/ip -6 addr add "${ip}/128" dev dummy0 || true
+done
 
-# Move one end to the namespace
-/sbin/ip link set ${VETH_CILIUM} netns ${NAMESPACE_CILIUM} || true
+# --- Veth Pair Setup with Namespace Isolation ---
+log "Ensuring veth pair ${VETH_FRR} (container) <-> ${VETH_CILIUM} (host)"
 
-# Configure IPv4 addresses
-if [ -n "${PEER_IP_LOCAL}" ] && [ -n "${PEER_IP_REMOTE}" ]; then
-    log "Configuring IPv4 peering: ${PEER_IP_LOCAL} <-> ${PEER_IP_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip a a ${PEER_IP_LOCAL}/${PEER_IP_PREFIX} dev ${VETH_CILIUM} || true
-    /sbin/ip a a ${PEER_IP_REMOTE}/${PEER_IP_PREFIX} dev ${VETH_FRR} || true
+# The host network namespace is identified by PID 1 due to `hostPID: true`
+HOST_NS_PID=1
+
+# Check if the Cilium-side veth exists in the host namespace
+if ! nsenter -t ${HOST_NS_PID} -n /sbin/ip link show ${VETH_CILIUM} >/dev/null 2>&1; then
+    log "Veth pair not found in host namespace. Recreating."
+    # Clean up old veth from both container and host namespaces to ensure a clean state
+    /sbin/ip link del ${VETH_FRR} 2>/dev/null || true
+    nsenter -t ${HOST_NS_PID} -n /sbin/ip link del ${VETH_CILIUM} 2>/dev/null || true
+
+    log "Creating veth pair with one end directly in the host namespace."
+    # This is the correct, atomic way to create a cross-namespace veth pair.
+    # It creates veth-frr in the container and veth-cilium in the host ns.
+    /sbin/ip link add ${VETH_FRR} type veth peer name ${VETH_CILIUM} netns ${HOST_NS_PID}
 fi
 
-# Configure IPv6 addresses
-if [ -n "${PEER_IPV6_LOCAL}" ] && [ -n "${PEER_IPV6_REMOTE}" ]; then
-    log "Configuring IPv6 peering: ${PEER_IPV6_LOCAL} <-> ${PEER_IPV6_REMOTE}"
-    /sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip -6 a a ${PEER_IPV6_LOCAL}/${PEER_IPV6_PREFIX} dev ${VETH_CILIUM} || true
-    /sbin/ip -6 a a ${PEER_IPV6_REMOTE}/${PEER_IPV6_PREFIX} dev ${VETH_FRR} || true
-fi
+# Configure FRR side (veth-frr) inside the container
+log "Configuring FRR side IPv6: ${CILIUM_PEER_IPV6_REMOTE}/${CILIUM_PEER_IPV6_PREFIX} on ${VETH_FRR}"
+/sbin/ip -6 addr add ${CILIUM_PEER_IPV6_REMOTE}/${CILIUM_PEER_IPV6_PREFIX} dev ${VETH_FRR} || true
+/sbin/ip link set ${VETH_FRR} mtu ${INTERFACE_MTU} up
 
-# Bring up interfaces
-log "Bringing up interfaces with MTU ${INTERFACE_MTU}"
-/sbin/ip link set ${VETH_FRR} up || true
-/sbin/ip link set ${VETH_FRR} mtu ${INTERFACE_MTU} || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} up || true
-/sbin/ip netns exec ${NAMESPACE_CILIUM} /sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} || true
+# Configure Cilium side (veth-cilium) inside the host namespace
+log "Configuring Cilium side IPv6: ${CILIUM_PEER_IPV6_LOCAL}/${CILIUM_PEER_IPV6_PREFIX} on ${VETH_CILIUM} in host ns"
+nsenter -t ${HOST_NS_PID} -n /sbin/ip -6 addr add ${CILIUM_PEER_IPV6_LOCAL}/${CILIUM_PEER_IPV6_PREFIX} dev ${VETH_CILIUM} || true
+nsenter -t ${HOST_NS_PID} -n /sbin/ip link set ${VETH_CILIUM} mtu ${INTERFACE_MTU} up
 
-# Version-based initialization
-CURRENT_VERSION=""
-if [ -f /etc/frr.defaults/VERSION ]; then
-    CURRENT_VERSION=$(cat /etc/frr.defaults/VERSION)
-    log "Container version: ${CURRENT_VERSION}"
-fi
+log "Network setup with namespace isolation complete."
 
-INSTALLED_VERSION=""
-if [ -f /etc/frr/.initialized ]; then
-    INSTALLED_VERSION=$(cat /etc/frr/.initialized 2>/dev/null || echo "")
-    log "Installed version: ${INSTALLED_VERSION}"
+# --- Filesystem Setup ---
+# The rootfs is read-only. We need /etc/frr to be writable for config generation.
+# We use a tmpfs overlay to avoid dependencies on the host filesystem.
+log "Mounting tmpfs on /etc/frr"
+mount -t tmpfs -o size=8M tmpfs /etc/frr
+
+# Populate /etc/frr with default files from the image
+if [ -d /etc/frr.defaults ]; then
+    log "Populating /etc/frr from /etc/frr.defaults"
+    cp -a /etc/frr.defaults/* /etc/frr/
 else
-    log "No initialized marker found (first boot)"
-fi
-
-# Initialize or update if version mismatch or first boot
-if [ "$CURRENT_VERSION" != "$INSTALLED_VERSION" ] || [ ! -f /etc/frr/.initialized ]; then
-    if [ -z "$INSTALLED_VERSION" ]; then
-        log "Initializing /etc/frr directory (first boot)"
-    else
-        log "Version mismatch detected (${INSTALLED_VERSION} -> ${CURRENT_VERSION})"
-        log "Updating template and configuration files..."
-    fi
-
-    # Copy defaults from backup to mounted directory
-    # Important: Copy template and daemons, but preserve frr.conf if it exists
+    log "WARNING: /etc/frr.defaults not found"
     mkdir -p /etc/frr
-    cp /etc/frr.defaults/frr.conf.j2 /etc/frr/frr.conf.j2 2>/dev/null || true
-    cp /etc/frr.defaults/daemons /etc/frr/daemons 2>/dev/null || true
-    cp /etc/frr.defaults/vtysh.conf /etc/frr/vtysh.conf 2>/dev/null || true
-    cp /etc/frr.defaults/version /etc/frr/version 2>/dev/null || true
-
-    # Write version to .initialized
-    echo "${CURRENT_VERSION}" > /etc/frr/.initialized
-    log "Initialized marker updated to version: ${CURRENT_VERSION}"
 fi
 
 # Ensure daemons file exists
@@ -149,6 +136,10 @@ log "Starting FRR daemons (including BFD if enabled)"
 # Wait for daemons to start
 sleep 5
 
+# Dump Cilium neighbor FSM state for troubleshooting
+log "Dumping Cilium neighbor FSM state"
+/usr/local/bin/dump-bgp-state.sh || true
+
 # Check BFD status if configured
 if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then
     log "Checking BFD daemon status"
@@ -168,8 +159,8 @@ while true; do
     if [ $count -lt ${MONITOR_COUNT} ]; then
         log "=== Status Check (${count}/${MONITOR_COUNT}) ==="
 
-        # BGP status
-        vtysh -c "show bgp vrf all summary wide" || true
+        # BGP status (MP-BGP includes both IPv4 and IPv6)
+        vtysh -c "show bgp summary" || true
 
         # BFD status if configured
         if grep -q "bfdd=true" /etc/frr/daemons 2>/dev/null; then

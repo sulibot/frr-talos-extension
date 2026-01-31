@@ -91,6 +91,9 @@ route-map {{ rm_name }} {{ rule.action }} {{ rule.seq }}
 {% if rule.set.src is defined %}
  set src {{ rule.set.src }}
 {% endif %}
+{% if rule.set.next_hop_self is defined and rule.set.next_hop_self %}
+ set ip next-hop peer-address
+{% endif %}
 {% endif %}
 !
 {% endfor %}
@@ -226,7 +229,8 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  address-family ipv4 unicast
 {% if bgp.cilium.peering.ipv4 is defined %}
   neighbor {{ bgp.cilium.peering.ipv4.local }} activate
-  neighbor {{ bgp.cilium.peering.ipv4.local }} route-map denymap out
+  ! Accept routes from Cilium (eBGP)
+  neighbor {{ bgp.cilium.peering.ipv4.local }} route-map IMPORT-FROM-CILIUM-v4 in
 {% endif %}
  exit-address-family
 
@@ -248,7 +252,8 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
 {% if bgp.cilium.peering.ipv6 is defined %}
  address-family ipv6 unicast
   neighbor {{ bgp.cilium.peering.ipv6.local }} activate
-  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap_v6 out
+  ! Accept routes from Cilium (eBGP)
+  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map IMPORT-FROM-CILIUM-v6 in
  exit-address-family
 {% endif %}
 !
