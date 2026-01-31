@@ -164,7 +164,8 @@ route-map ADVERTISE_{{ peer_index }} permit 10
 !
 route-map ADVERTISE_{{ peer_index }} deny 20
 !
-{% elif peer.address_family == 'ipv6' %}
+{% endif %}
+{% if peer.address_family == 'ipv6' or (peer.address_family is defined and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
 ! IPv6 prefix-list for peer {{ peer.address }}
 {% for network in peer.advertise_networks %}
 {# Handle both string and dict formats #}
@@ -284,6 +285,9 @@ router bgp {{ bgp.upstream.local_asn }}
 {% if peer.update_source is defined %}
  neighbor {{ peer.address }} update-source {{ peer.update_source }}
 {% endif %}
+{% if peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop %}
+ neighbor {{ peer.address }} capability extended-nexthop
+{% endif %}
 {% endfor %}
 {% endif %}
 
@@ -291,9 +295,11 @@ router bgp {{ bgp.upstream.local_asn }}
  address-family ipv4 unicast
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
-{% if peer.address_family is not defined or peer.address_family == 'ipv4' %}
+{% if peer.address_family is not defined or peer.address_family == 'ipv4' or (peer.address_family == 'ipv6' and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
   neighbor {{ peer.address }} activate
-{% if peer.route_map_in is defined %}
+{% if peer.route_map_in_v4 is defined %}
+  neighbor {{ peer.address }} route-map {{ peer.route_map_in_v4 }} in
+{% elif peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
 {% if peer.route_map_out is defined %}
@@ -317,15 +323,16 @@ router bgp {{ bgp.upstream.local_asn }}
 {% endfor %}
 {% endif %}
   redistribute connected route-map loopbacks
-  import vrf {{ bgp.cilium.namespace }}
  exit-address-family
 
  address-family ipv6 unicast
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
-{% if peer.address_family == 'ipv6' %}
+{% if peer.address_family == 'ipv6' or (peer.address_family is defined and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
   neighbor {{ peer.address }} activate
-{% if peer.route_map_in is defined %}
+{% if peer.route_map_in_v6 is defined %}
+  neighbor {{ peer.address }} route-map {{ peer.route_map_in_v6 }} in
+{% elif peer.route_map_in is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in }} in
 {% endif %}
 {% if peer.route_map_out is defined %}
@@ -349,7 +356,6 @@ router bgp {{ bgp.upstream.local_asn }}
 {% endfor %}
 {% endif %}
   redistribute connected route-map loopbacks
-  import vrf {{ bgp.cilium.namespace }}
  exit-address-family
 !
 ip protocol bgp route-map SETSRC
