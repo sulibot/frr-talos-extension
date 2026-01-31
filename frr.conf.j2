@@ -244,8 +244,8 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  address-family ipv4 unicast
 {% if bgp.cilium.peering.ipv6 is defined %}
   neighbor {{ bgp.cilium.peering.ipv6.local }} activate
-  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map denymap out
-  neighbor {{ bgp.cilium.peering.ipv6.local }} extended-nexthop
+  ! Accept routes from Cilium (eBGP)
+  neighbor {{ bgp.cilium.peering.ipv6.local }} route-map IMPORT-FROM-CILIUM-v4 in
 {% endif %}
  exit-address-family
 
