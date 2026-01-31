@@ -239,6 +239,7 @@ router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.ci
  neighbor {{ bgp.cilium.peering.ipv6.local }} description Cilium-BGP-Control-Plane-IPv6
  neighbor {{ bgp.cilium.peering.ipv6.local }} passive
  neighbor {{ bgp.cilium.peering.ipv6.local }} capability extended-nexthop
+ neighbor {{ bgp.cilium.peering.ipv6.local }} update-source {{ bgp.cilium.peering.ipv6.local }}
 {% endif %}
 
  address-family ipv4 unicast
