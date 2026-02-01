@@ -26,9 +26,8 @@ FRR_TEMPLATE="/etc/frr/frr.conf.j2"
 log "Using FRR template: ${FRR_TEMPLATE}"
 
 log "Setting up network (Host Network Mode)"
-# No extra plumbing needed for Option A.
-# FRR runs in host netns and peers on loopback addresses which are
-# configured by Talos machine config.
+# FRR runs in host network and uses BGP listen range to accept
+# connections from Cilium (any IP in fd00::/8 with matching ASN).
 log "Network setup complete (Option A - Host Network)."
 
 # --- Filesystem Setup ---
