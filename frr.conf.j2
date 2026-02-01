@@ -221,11 +221,13 @@ router bgp {{ bgp.cilium.local_asn }}
 
  ! Cilium peer configuration - dynamic peer via listen range
  ! Accept connections from any ULA address (fd00::/8) with matching ASN
- bgp listen range fd00::/8 peer-group cilium-peers
+ ! First create the peer-group, then configure it, then apply listen range
+ neighbor cilium-peers peer-group
  neighbor cilium-peers remote-as {{ bgp.cilium.remote_asn }}
  neighbor cilium-peers description Cilium-BGP-Control-Plane
  neighbor cilium-peers passive
  neighbor cilium-peers capability extended-nexthop
+ bgp listen range fd00::/8 peer-group cilium-peers
 
  address-family ipv4 unicast
   neighbor cilium-peers activate

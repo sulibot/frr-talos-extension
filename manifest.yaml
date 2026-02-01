@@ -1,10 +1,11 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.7.12
+  version: v1.7.13
   author: Sulaiman Ahmad (sulibot@gmail.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
+    v1.7.13: Fix BGP peer-group creation order - create peer-group before applying listen range. Fixes "Create the peer-group or interface first" error in v1.7.12.
     v1.7.12: Use BGP listen range (fd00::/8) for flexible Cilium peering - FRR accepts connections from any ULA address with matching ASN. Fixes "Can not configure the local system as neighbor" error. No hardcoded IPs, works with any cilium_host allocation.
     v1.7.11: Remove VRF isolation for Cilium BGP - run in default VRF for proper loopback peering. Fixes BGP session stuck in idle state by ensuring FRR and Cilium are in same routing domain.
     v1.7.10: Remove stale IPv4 veth config from config.default.yaml - fixes Cilium BGP peering by eliminating duplicate neighbor configuration. Loopback architecture only.
