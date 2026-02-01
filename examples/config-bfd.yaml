@@ -5,7 +5,6 @@ bgp:
   cilium:
     local_asn: 4200099998
     remote_asn: 4200099999
-    namespace: cilium  # Linux network namespace name
     peering:
       ipv6:
         local: "fd00:101:fe::11"        # Example - overridden by Terraform

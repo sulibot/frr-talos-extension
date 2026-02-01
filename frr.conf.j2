@@ -212,8 +212,8 @@ route-map ADVERTISE_V6_{{ peer_index }} deny 20
 {% endfor %}
 {% endif %}
 
-! BGP Configuration for Cilium peering (VRF)
-router bgp {{ bgp.cilium.local_asn }}{% if bgp.cilium.namespace %} vrf {{ bgp.cilium.namespace }}{% endif %}
+! BGP Configuration for Cilium peering (host network)
+router bgp {{ bgp.cilium.local_asn }}
 
  bgp router-id {{ bgp.upstream.router_id }}
  no bgp ebgp-requires-policy
