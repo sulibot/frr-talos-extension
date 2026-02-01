@@ -2,7 +2,7 @@ version: v1alpha1
 metadata:
   name: frr
   version: v1.7.12
-  author: Kai Zhang (kimi.zhangkai@gmail.com), Jonathan Senecal (contact@jonathansenecal.com)
+  author: Sulaiman Ahmad (sulibot@gmail.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
     v1.7.12: Use BGP listen range (fd00::/8) for flexible Cilium peering - FRR accepts connections from any ULA address with matching ASN. Fixes "Can not configure the local system as neighbor" error. No hardcoded IPs, works with any cilium_host allocation.

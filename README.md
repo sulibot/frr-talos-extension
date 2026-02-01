@@ -4,9 +4,13 @@
 
 BGP routing for Talos Linux with Cilium integration, multi-peer support, and BFD configuration.
 
+## Author
+
+**Sulaiman Ahmad** (sulibot@gmail.com)
+
 ## Acknowledgments
 
-This project is based on the original work in [abckey/frr-talos-extension](https://github.com/abckey/frr-talos-extension) by Kai Zhang (kimi.zhangkai@gmail.com).
+This project is based on the original work in [abckey/frr-talos-extension](https://github.com/abckey/frr-talos-extension) by Kai Zhang.
 
 ## Overview
 
