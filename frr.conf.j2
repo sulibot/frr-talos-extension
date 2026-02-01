@@ -212,12 +212,12 @@ route-map ADVERTISE_V6_{{ peer_index }} deny 20
 {% endfor %}
 {% endif %}
 
-! BGP Configuration for Cilium peering (host network)
-router bgp {{ bgp.cilium.local_asn }}
-
+! BGP Configuration - Unified router bgp block for Cilium and upstream peers
+router bgp {{ bgp.upstream.local_asn }}
  bgp router-id {{ bgp.upstream.router_id }}
  no bgp ebgp-requires-policy
  no bgp default ipv4-unicast
+ bgp bestpath as-path multipath-relax
 
  ! Cilium peer configuration - dynamic peer via listen range
  ! Accept connections from any ULA address (fd00::/8) with matching ASN
@@ -228,26 +228,6 @@ router bgp {{ bgp.cilium.local_asn }}
  neighbor cilium-peers passive
  neighbor cilium-peers capability extended-nexthop
  bgp listen range fd00::/8 peer-group cilium-peers
-
- address-family ipv4 unicast
-  neighbor cilium-peers activate
-  ! Accept routes from Cilium (eBGP)
-  neighbor cilium-peers route-map IMPORT-FROM-CILIUM-v4 in
- exit-address-family
-
- address-family ipv6 unicast
-  neighbor cilium-peers activate
-  ! Accept routes from Cilium (eBGP)
-  neighbor cilium-peers route-map IMPORT-FROM-CILIUM-v6 in
- exit-address-family
-!
-
-! BGP Configuration for upstream fabric peering
-router bgp {{ bgp.upstream.local_asn }}
- bgp router-id {{ bgp.upstream.router_id }}
- no bgp ebgp-requires-policy
- no bgp default ipv4-unicast
- bgp bestpath as-path multipath-relax
 
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
@@ -282,6 +262,9 @@ router bgp {{ bgp.upstream.local_asn }}
 
  ! Address families
  address-family ipv4 unicast
+  ! Activate Cilium peer-group
+  neighbor cilium-peers activate
+  neighbor cilium-peers route-map IMPORT-FROM-CILIUM-v4 in
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family is not defined or peer.address_family == 'ipv4' or (peer.address_family == 'ipv6' and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
@@ -315,6 +298,9 @@ router bgp {{ bgp.upstream.local_asn }}
  exit-address-family
 
  address-family ipv6 unicast
+  ! Activate Cilium peer-group
+  neighbor cilium-peers activate
+  neighbor cilium-peers route-map IMPORT-FROM-CILIUM-v6 in
 {% if bgp.upstream.peers is defined %}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family == 'ipv6' or (peer.address_family is defined and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
