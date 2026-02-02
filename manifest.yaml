@@ -1,11 +1,12 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.7.15
+  version: v1.7.16
   author: Sulaiman Ahmad (sulibot@gmail.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
-    v1.7.15: Fix RFC5549 next-hop rewriting - always use 'set ipv6 next-hop peer-address' for all BGP sessions since both Cilium and PVE peers use IPv6 addresses with extended-nexthop capability. Previous logic checked route address family instead of BGP session address family, causing IPv4 routes with IPv6 next-hops to fail next-hop rewriting. Fixes LoadBalancer route advertisement from Cilium to FRR to PVE.
+    v1.7.16: Fix route-map next-hop commands to match address-family context. Route-maps apply within specific address-family blocks (ipv4/ipv6), so commands must match that context: 'set ip next-hop peer-address' for IPv4 address-family, 'set ipv6 next-hop peer-address' for IPv6 address-family. While BGP sessions use IPv6 (RFC5549), the route-map command must match where it's applied. Without this, FRR silently ignores mismatched commands and routes never enter RIB. Reverts v1.7.15's incorrect assumption that session type determines command.
+    v1.7.15: INCORRECT - Always used IPv6 command regardless of address-family context. Caused IPv4 routes to fail next-hop rewriting and not be installed in RIB.
     v1.7.14: Merge duplicate router bgp sections into single unified block - fixes bgp listen range being lost when Cilium and upstream use same ASN. Ensures Cilium dynamic peers and upstream neighbors coexist properly in single BGP process.
     v1.7.13: Fix BGP peer-group creation order - create peer-group before applying listen range. Fixes "Create the peer-group or interface first" error in v1.7.12.
     v1.7.12: Use BGP listen range (fd00::/8) for flexible Cilium peering - FRR accepts connections from any ULA address with matching ASN. Fixes "Can not configure the local system as neighbor" error. No hardcoded IPs, works with any cilium_host allocation.
