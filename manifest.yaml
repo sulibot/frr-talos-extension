@@ -1,10 +1,11 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.7.14
+  version: v1.7.15
   author: Sulaiman Ahmad (sulibot@gmail.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
+    v1.7.15: Fix RFC5549 next-hop rewriting - always use 'set ipv6 next-hop peer-address' for all BGP sessions since both Cilium and PVE peers use IPv6 addresses with extended-nexthop capability. Previous logic checked route address family instead of BGP session address family, causing IPv4 routes with IPv6 next-hops to fail next-hop rewriting. Fixes LoadBalancer route advertisement from Cilium to FRR to PVE.
     v1.7.14: Merge duplicate router bgp sections into single unified block - fixes bgp listen range being lost when Cilium and upstream use same ASN. Ensures Cilium dynamic peers and upstream neighbors coexist properly in single BGP process.
     v1.7.13: Fix BGP peer-group creation order - create peer-group before applying listen range. Fixes "Create the peer-group or interface first" error in v1.7.12.
     v1.7.12: Use BGP listen range (fd00::/8) for flexible Cilium peering - FRR accepts connections from any ULA address with matching ASN. Fixes "Can not configure the local system as neighbor" error. No hardcoded IPs, works with any cilium_host allocation.
