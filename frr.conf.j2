@@ -96,7 +96,7 @@ route-map {{ rm_name }} {{ rule.action }} {{ rule.seq }}
  set ipv6 next-hop peer-address
 {%- else -%}
  set ip next-hop peer-address
-{%- endif -%}
+{% endif %}
 {% endif %}
 {% endif %}
 !
