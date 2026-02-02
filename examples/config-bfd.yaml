@@ -61,6 +61,43 @@ network:
     frr_side: veth-frr
     cilium_side: veth-cilium
 
+# Route filters (prefix-lists and route-maps)
+route_filters:
+  prefix_lists:
+    ipv4:
+      CILIUM-ALL-v4:
+        rules:
+          - seq: 10
+            action: permit
+            prefix: 10.0.0.0/8
+            le: 32
+    ipv6:
+      CILIUM-ALL-v6:
+        rules:
+          - seq: 10
+            action: permit
+            prefix: "fd00::/8"
+            le: 128
+  route_maps:
+    IMPORT-FROM-CILIUM-v4:
+      rules:
+        - seq: 10
+          action: permit
+          match:
+            address_family: ipv4
+            prefix_list: CILIUM-ALL-v4
+          set:
+            next_hop_self: true
+    IMPORT-FROM-CILIUM-v6:
+      rules:
+        - seq: 10
+          action: permit
+          match:
+            address_family: ipv6
+            prefix_list: CILIUM-ALL-v6
+          set:
+            next_hop_self: true
+
 # BFD Configuration Section
 bfd:
   # BFD Profiles - reusable timer configurations
