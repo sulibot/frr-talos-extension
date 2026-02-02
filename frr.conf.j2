@@ -92,9 +92,9 @@ route-map {{ rm_name }} {{ rule.action }} {{ rule.seq }}
  set src {{ rule.set.src }}
 {% endif %}
 {% if rule.set.next_hop_self is defined and rule.set.next_hop_self %}
-{%- if rule.match.address_family == "ipv6" -%}
+{% if rule.match.address_family == "ipv6" %}
  set ipv6 next-hop peer-address
-{%- else -%}
+{% else %}
  set ip next-hop peer-address
 {% endif %}
 {% endif %}

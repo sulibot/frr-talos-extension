@@ -1,11 +1,12 @@
 version: v1alpha1
 metadata:
   name: frr
-  version: v1.7.17
+  version: v1.7.18
   author: Sulaiman Ahmad (sulibot@gmail.com)
   description: |
     This system extension provides FRR BGP routing on the host with Cilium integration.
-    v1.7.17: Fix Jinja2 template whitespace stripping causing malformed FRR config. The {%- endif -%} on line 99 was stripping the newline after 'set ip/ipv6 next-hop peer-address', causing the '!' comment separator to be concatenated to the command (e.g., 'peer-address!'). FRR rejected this malformed syntax, preventing next-hop rewriting and route installation. Changed to {% endif %} (no trailing dash) to preserve the newline. This completes the v1.7.16 fix.
+    v1.7.18: Fix next-hop peer-address rendering for IPv6 route-maps. render_template.py uses trim_blocks=True which strips newlines after {% %} tags — the {%- -%} dashes on the inner if/else were fighting trim_blocks, stripping the trailing newline from the IPv6 text but not IPv4. This caused 'set ipv6 next-hop peer-address!' concatenation while IPv4 worked. Removed all dashes from the inner if/else block; trim_blocks handles whitespace consistently for both branches.
+    v1.7.17: INCOMPLETE - Fixed {%- endif -%} but missed that {%- else -%} also strips the IPv6 branch trailing newline. IPv4 worked, IPv6 still produced 'peer-address!'.
     v1.7.16: INCOMPLETE - Had correct logic but Jinja2 whitespace stripping created malformed config. Commands generated as 'peer-address!' instead of 'peer-address\n!'. FRR ignored the malformed commands, routes never installed in RIB.
     v1.7.15: INCORRECT - Always used IPv6 command regardless of address-family context. Caused IPv4 routes to fail next-hop rewriting and not be installed in RIB.
     v1.7.14: Merge duplicate router bgp sections into single unified block - fixes bgp listen range being lost when Cilium and upstream use same ASN. Ensures Cilium dynamic peers and upstream neighbors coexist properly in single BGP process.
