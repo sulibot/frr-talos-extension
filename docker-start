@@ -46,6 +46,13 @@ else
     mkdir -p /etc/frr
 fi
 
+# Apply mounted template override if present (ExtensionServiceConfig)
+# Must run after defaults copy — tmpfs populate overwrites any prior mount
+if [ -f /usr/local/etc/frr/frr.conf.j2 ]; then
+    log "Applying mounted template override: /usr/local/etc/frr/frr.conf.j2"
+    cp /usr/local/etc/frr/frr.conf.j2 /etc/frr/frr.conf.j2
+fi
+
 # Ensure daemons file exists
 if [ ! -f /etc/frr/daemons ]; then
     cp /etc/frr.defaults/daemons /etc/frr/daemons

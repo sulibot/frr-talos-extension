@@ -91,12 +91,11 @@ route-map {{ rm_name }} {{ rule.action }} {{ rule.seq }}
 {% if rule.set.src is defined %}
  set src {{ rule.set.src }}
 {% endif %}
-{% if rule.set.next_hop_self is defined and rule.set.next_hop_self %}
-{% if rule.match.address_family == "ipv6" %}
- set ipv6 next-hop peer-address
-{% else %}
- set ip next-hop peer-address
+{% if rule.set.ip_next_hop is defined %}
+ set ip next-hop {{ rule.set.ip_next_hop }}
 {% endif %}
+{% if rule.set.ipv6_next_hop is defined %}
+ set ipv6 next-hop global {{ rule.set.ipv6_next_hop }}
 {% endif %}
 {% endif %}
 !
