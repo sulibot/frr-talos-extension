@@ -272,6 +272,9 @@ router bgp {{ bgp.upstream.local_asn }}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family is not defined or peer.address_family == 'ipv4' or (peer.address_family == 'ipv6' and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
   neighbor {{ peer.address }} activate
+{% if peer.next_hop_self is defined and peer.next_hop_self %}
+  neighbor {{ peer.address }} next-hop-self
+{% endif %}
 {% if peer.route_map_in_v4 is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in_v4 }} in
 {% elif peer.route_map_in is defined %}
@@ -308,6 +311,9 @@ router bgp {{ bgp.upstream.local_asn }}
 {% for peer in bgp.upstream.peers %}
 {% if peer.address_family == 'ipv6' or (peer.address_family is defined and peer.capability_extended_nexthop is defined and peer.capability_extended_nexthop) %}
   neighbor {{ peer.address }} activate
+{% if peer.next_hop_self is defined and peer.next_hop_self %}
+  neighbor {{ peer.address }} next-hop-self
+{% endif %}
 {% if peer.route_map_in_v6 is defined %}
   neighbor {{ peer.address }} route-map {{ peer.route_map_in_v6 }} in
 {% elif peer.route_map_in is defined %}
